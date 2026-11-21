@@ -81,74 +81,76 @@ function googleClient() {
   return new OAuth2Client({
     clientId: google.clientId,
     clientSecret: google.clientSecret,
-    redirectUri: google.redirectUri,
+    redirectUri: `${config().publicUrl}/api/auth/google/callback`,
   });
 }
 
-export async function googleStart(_req: Request, res: Response, next: NextFunction) {
-  try {
-    const state = randomToken();
-    const verifier = randomToken(48);
-    const client = googleClient();
-    const challenge = await client.generateCodeVerifierAsync();
-    const codeVerifier = challenge.codeVerifier;
-    const codeChallenge = challenge.codeChallenge;
-    await prisma.oAuthState.create({
-      data: {
-        state,
-        purpose: 'sign-in',
-        verifier: codeVerifier,
-        expiresAt: new Date(Date.now() + STATE_MINUTES * 60_000),
-      },
-    });
-    const url = client.generateAuthUrl({
+export async function saveOAuthState(purpose: string, verifier: string, userId: string | null) {
+  const state = randomToken(24);
+  const now = new Date();
+  await prisma.oAuthState.deleteMany({ where: { expiresAt: { lt: now } } });
+  await prisma.oAuthState.create({
+    data: { state, purpose, verifier, userId, expiresAt: new Date(now.getTime() + STATE_MINUTES * 60_000) },
+  });
+  return state;
+}
+
+/** One use only: the row is deleted as it is read. */
+export async function takeOAuthState(state: unknown, purpose: string) {
+  if (typeof state !== 'string' || state.length > 100) return null;
+  const row = await prisma.oAuthState.findUnique({ where: { state } });
+  if (!row) return null;
+  await prisma.oAuthState.delete({ where: { state } });
+  if (row.purpose !== purpose || row.expiresAt < new Date()) return null;
+  return row;
+}
+
+export async function googleStart(_req: Request, res: Response) {
+  const client = googleClient();
+  const { codeVerifier, codeChallenge } = await client.generateCodeVerifierAsync();
+  const state = await saveOAuthState('google', codeVerifier, null);
+  res.redirect(
+    client.generateAuthUrl({
       scope: ['openid', 'email', 'profile'],
       state,
+      prompt: 'select_account',
       code_challenge: codeChallenge,
       code_challenge_method: CodeChallengeMethod.S256,
-      prompt: 'select_account',
-    });
-    res.redirect(url);
-  } catch (err) {
-    next(err);
-  }
+    }),
+  );
 }
 
-const CallbackSchema = z.object({ code: z.string().min(1), state: z.string().min(1) });
-
-export async function googleCallback(req: Request, res: Response, next: NextFunction) {
+export async function googleCallback(req: Request, res: Response) {
+  const row = await takeOAuthState(req.query.state, 'google');
+  if (!row || typeof req.query.code !== 'string') return res.redirect('/sign-in?error=expired');
+  const client = googleClient();
   try {
-    const { code, state } = CallbackSchema.parse(req.query);
-    const row = await prisma.oAuthState.findUnique({ where: { state } });
-    if (!row || row.purpose !== 'sign-in' || row.expiresAt < new Date())
-      throw new AppError(400, 'BAD_OAUTH_STATE', 'Sign-in expired. Try again.');
-    await prisma.oAuthState.delete({ where: { state } });
-    const client = googleClient();
-    const { tokens } = await client.getToken({ code, codeVerifier: row.verifier });
-    if (!tokens.id_token) throw new AppError(401, 'GOOGLE_NO_ID_TOKEN', 'Google did not return an identity.');
-    const ticket = await client.verifyIdToken({ idToken: tokens.id_token, audience: config().google?.clientId });
+    const { tokens } = await client.getToken({ code: req.query.code, codeVerifier: row.verifier });
+    const ticket = await client.verifyIdToken({ idToken: tokens.id_token ?? '', audience: config().google!.clientId });
     const payload = ticket.getPayload();
-    if (!payload?.email || !payload.email_verified || !isOwnerEmail(payload.email))
-      throw new AppError(403, 'NOT_OWNER', 'This email is not allowed to sign in.');
-    const user = await upsertOwner(payload.email, payload.name ?? payload.email);
+    if (!payload?.email || !payload.email_verified) return res.redirect('/sign-in?error=google');
+    if (!isOwnerEmail(payload.email)) {
+      logEvent('sign_in_refused', { reason: 'not_owner' });
+      return res.redirect('/sign-in?error=private');
+    }
+    const user = await upsertOwner(payload.email, payload.name || payload.email.split('@')[0]);
     await startSession(res, user.id);
-    logEvent('sign_in', { method: 'google' });
+    logEvent('signed_in', { userId: user.id, method: 'google' });
     res.redirect('/');
   } catch (err) {
-    next(err);
+    logEvent('sign_in_failed', { errorCategory: err instanceof Error ? err.name : 'UnknownError' });
+    res.redirect('/sign-in?error=google');
   }
 }
 
-export async function devLogin(req: Request, res: Response, next: NextFunction) {
-  try {
-    if (config().production || !config().devLogin) throw new AppError(404, 'NOT_FOUND', 'Not found.');
-    const email = z.object({ email: z.string().email() }).parse(req.body).email.toLowerCase();
-    if (!isOwnerEmail(email)) throw new AppError(403, 'NOT_OWNER', 'This email is not allowed to sign in.');
-    const user = await upsertOwner(email, email);
-    await startSession(res, user.id);
-    logEvent('sign_in', { method: 'dev' });
-    res.json({ ok: true });
-  } catch (err) {
-    next(err);
-  }
+const DevLoginSchema = z.object({ email: z.string().trim().email().max(200) }).strict();
+
+/** Local testing only (DEV_LOGIN=1, never in production): sign in as an owner email without Google. */
+export async function devLogin(req: Request, res: Response) {
+  if (!config().devLogin) throw new AppError(404, 'NOT_FOUND', 'Not found.');
+  const { email } = DevLoginSchema.parse(req.body);
+  if (!isOwnerEmail(email)) throw new AppError(403, 'PRIVATE', 'This app is private.');
+  const user = await upsertOwner(email, email.split('@')[0]);
+  await startSession(res, user.id);
+  res.json({ ok: true });
 }
