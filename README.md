@@ -17,10 +17,12 @@ Private for now: only the emails in `OWNER_EMAIL` can sign in.
 
 Needs Node 22.22+ or 24.15+ and PostgreSQL.
 
+```
 cp .env.example .env        # set DATABASE_URL and OWNER_EMAIL
 npm ci
 npx prisma migrate dev
 npm run dev                 # server on PORT (3590), web on WEB_PORT (5590)
+```
 
 With `DEV_LOGIN=1` the sign-in page has a dev sign-in for an `OWNER_EMAIL` address, and with `FAKE_SOCIAL=1` X and LinkedIn are fake (nothing is posted; a text with `[fail]` fails on purpose). Both are refused when `NODE_ENV=production`.
 
