@@ -1,0 +1,49 @@
+name: Lockfile once (temporary)
+# Adds the reviewed package-lock.json to feat/first-version and nothing else.
+# Lives only on the throwaway branch tmp/lockfile-once, which is deleted afterwards.
+on:
+  push:
+    branches: [tmp/lockfile-once]
+permissions:
+  contents: write
+concurrency:
+  group: lockfile-once
+  cancel-in-progress: false
+jobs:
+  finish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: feat/first-version
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Check the branch
+        run: |
+          if [ "$(git rev-parse 'HEAD^{tree}')" != "ed349d030657a1253c8d4c99ab11fe04a0167aef" ]; then
+            echo "feat/first-version does not hold exactly the reviewed files. Nothing was changed."
+            git ls-tree -r --name-only HEAD
+            exit 1
+          fi
+      - name: Make the lockfile the reviewed way
+        run: npx -y npm@11.19.0 install --package-lock-only --ignore-scripts --no-audit --no-fund --before=2026-11-19T17:27:18Z
+      - name: Check it is the reviewed lockfile
+        run: |
+          if [ "$(git hash-object package-lock.json)" != "37c44f0f92f4920d25e6cd2d5a89688b02e41339" ]; then
+            echo "The lockfile does not match the reviewed one. Nothing was pushed."
+            exit 1
+          fi
+          git add package-lock.json
+          if [ "$(git write-tree)" != "15824ec9e7e80e2f40b4b9b3e914bf3488e987c5" ]; then
+            echo "The result does not match the reviewed files. Nothing was pushed."
+            git status --short
+            exit 1
+          fi
+      - name: Commit only the reviewed result
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'build: package-lock.json'
+          git push origin HEAD:feat/first-version
