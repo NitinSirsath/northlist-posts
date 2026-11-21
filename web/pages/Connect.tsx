@@ -28,9 +28,9 @@ export interface ConnectSearch {
 export function setupPrompt({ mcpUrl, kitUrl, token }: { mcpUrl: string; kitUrl: string; token: string }) {
   return [
     'Connect NorthList Posts to this AI app, then set up my profile.',
-    \`Server: \${mcpUrl}\`,
-    \`Token: \${token}\`,
-    \`1. Work in the NorthList Posts kit folder. If you are not in it, get it first: \${kitUrl}\`,
+    `Server: ${mcpUrl}`,
+    `Token: ${token}`,
+    `1. Work in the NorthList Posts kit folder. If you are not in it, get it first: ${kitUrl}`,
     '2. Follow instructions/connect.md in the kit to add the server with this token. Never write the token into the kit folder or any file in it.',
     '3. Then follow instructions/setup.md and ask me the setup questions.',
   ].join('\n');
@@ -38,11 +38,11 @@ export function setupPrompt({ mcpUrl, kitUrl, token }: { mcpUrl: string; kitUrl:
 
 function bannerText(search: ConnectSearch) {
   const name = search.channel === 'linkedin' ? 'LinkedIn' : search.channel === 'x' ? 'X' : 'The account';
-  if (search.connected === 1) return { ok: true, text: \`\${name} is connected.\` };
+  if (search.connected === 1) return { ok: true, text: `${name} is connected.` };
   if (search.error === 'expired') return { ok: false, text: 'That took too long. Try again.' };
   if (search.error === 'denied')
-    return { ok: false, text: \`\${name} was not allowed. Try again if you meant to connect.\` };
-  if (search.error) return { ok: false, text: \`Could not connect \${name}. Try again.\` };
+    return { ok: false, text: `${name} was not allowed. Try again if you meant to connect.` };
+  if (search.error) return { ok: false, text: `Could not connect ${name}. Try again.` };
   return null;
 }
 
@@ -118,7 +118,7 @@ function Step({
   return (
     <li className="grid grid-cols-[28px_1fr] items-start gap-3.5 px-4 py-4 md:grid-cols-[28px_1fr_auto] md:px-6 md:py-[18px]">
       <span
-        aria-label={done ? 'Done' : \`Step \${n}\`}
+        aria-label={done ? 'Done' : `Step ${n}`}
         className={clsx(
           'inline-flex size-[26px] items-center justify-center rounded-full text-[13px] font-semibold',
           done ? 'bg-ok text-white' : 'text-text-secondary shadow-[inset_0_0_0_1px_var(--border-default)]',
@@ -263,7 +263,7 @@ function TokenList({ tokens }: { tokens: IntegrationTokenView[] }) {
               <span className="text-text-primary">{t.name}</span>
               <span className="order-last text-text-secondary md:order-none">Created {shortDate(t.createdAt)}</span>
               <span className="order-last text-text-secondary md:order-none">
-                {t.lastUsedAt ? \`Last used \${when(t.lastUsedAt)}\` : 'Not used yet'}
+                {t.lastUsedAt ? `Last used ${when(t.lastUsedAt)}` : 'Not used yet'}
               </span>
               <span className="row-start-1 text-right md:row-auto">
                 {off ? (
@@ -274,7 +274,7 @@ function TokenList({ tokens }: { tokens: IntegrationTokenView[] }) {
                     className="btn btn-plain btn-sm"
                     onClick={() => revoke.mutate(t.id)}
                     disabled={revoke.isPending}
-                    aria-label={\`Revoke \${t.name}\`}
+                    aria-label={`Revoke ${t.name}`}
                   >
                     Revoke
                   </button>
@@ -290,7 +290,7 @@ function TokenList({ tokens }: { tokens: IntegrationTokenView[] }) {
 }
 
 const CHANNELS: Channel[] = ['X', 'LINKEDIN'];
-const startUrl = (channel: Channel) => \`/api/connect/\${channel === 'X' ? 'x' : 'linkedin'}/start\`;
+const startUrl = (channel: Channel) => `/api/connect/${channel === 'X' ? 'x' : 'linkedin'}/start`;
 
 function WherePostsGo({ fake }: { fake: boolean }) {
   const connections = useConnections();
@@ -340,7 +340,7 @@ function ChannelRow({
         </span>
         {expiring && (
           <span className="tag tag-yellow">
-            {days === 0 ? 'Reconnect today' : \`Reconnect in \${days} day\${days === 1 ? '' : 's'}\`}
+            {days === 0 ? 'Reconnect today' : `Reconnect in ${days} day${days === 1 ? '' : 's'}`}
           </span>
         )}
       </span>
@@ -357,7 +357,7 @@ function ChannelRow({
               className="btn btn-plain btn-sm"
               onClick={onDisconnect}
               disabled={disconnecting}
-              aria-label={\`Disconnect \${name}\`}
+              aria-label={`Disconnect ${name}`}
             >
               Disconnect
             </button>
