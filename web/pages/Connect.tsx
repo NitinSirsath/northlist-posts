@@ -33,7 +33,7 @@ export function setupPrompt({ mcpUrl, kitUrl, token }: { mcpUrl: string; kitUrl:
     \`1. Work in the NorthList Posts kit folder. If you are not in it, get it first: \${kitUrl}\`,
     '2. Follow instructions/connect.md in the kit to add the server with this token. Never write the token into the kit folder or any file in it.',
     '3. Then follow instructions/setup.md and ask me the setup questions.',
-  ].join('\\n');
+  ].join('\n');
 }
 
 function bannerText(search: ConnectSearch) {
