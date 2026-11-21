@@ -98,7 +98,7 @@ describe('LinkedIn', () => {
     expect(init.headers).toMatchObject({ 'LinkedIn-Version': '202611', 'X-Restli-Protocol-Version': '2.0.0' });
     const body = JSON.parse(init.body);
     expect(body).toMatchObject({ author: 'urn:li:person:abc', visibility: 'PUBLIC', lifecycleState: 'PUBLISHED' });
-    expect(body.commentary).toBe('Hi \\\(all\\\\) \\\#dev \\\@x');
+    expect(body.commentary).toBe('Hi \\(all\\) \\#dev \\@x');
   });
 
   it('escapes every LinkedIn markup character', () => {
