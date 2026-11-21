@@ -1,0 +1,479 @@
+@import 'tailwindcss';
+
+/* Colour tokens from the NorthList look. No blue (owner, 19 Nov 2026): the one main action is a dark pill in light
+   and a light pill in dark, links are the text colour. Only the logo mark keeps its brand blue. The computer setting picks light or dark. */
+:root {
+  --canvas: #ffffff;
+  --surface: #ffffff;
+  --surface-subtle: #f5f5f6;
+  --surface-selected: #ececee;
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-tertiary: #71717a;
+  --link: #18181b;
+  --danger-text: #d92d20;
+  --ok: #079455;
+  --border-subtle: #ededef;
+  --border-default: #e1e1e5;
+  --border-focus: #18181b;
+  --nav-active: #ececee;
+  --canvas-hover: #f5f5f6;
+  --action-primary: #18181b;
+  --action-primary-hover: #3f3f46;
+  --action-primary-text: #ffffff;
+  --btn-secondary-bg: #ffffff;
+  --btn-secondary-ring: #e1e1e5;
+  --tag-red-bg: #fef3f2;
+  --tag-red: #b42318;
+  --tag-red-ring: #fecdca;
+  --tag-yellow-bg: #fffaeb;
+  --tag-yellow: #b54708;
+  --tag-yellow-ring: #fedf89;
+  --tag-gray-bg: #f4f4f5;
+  --tag-gray: #3f3f46;
+  --tag-gray-ring: #e4e4e7;
+  --glass: rgb(250 250 252 / 0.74);
+  --glass-edge: rgb(0 0 0 / 0.08);
+  --phone-bg: #f2f2f7;
+  --phone-group: #ffffff;
+  /* The chosen side of a phone switch (iOS: white in light, grey in dark). */
+  --seg-on: #ffffff;
+  --avatar: #e4e4e7;
+  --avatar-text: #3f3f46;
+  --mark: #2563eb;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #0b0b0c;
+    --surface: #111113;
+    --surface-subtle: #18181b;
+    --surface-selected: #222226;
+    --text-primary: #ededef;
+    --text-secondary: #a1a1aa;
+    --text-tertiary: #8b8b94;
+    --link: #ededef;
+    --danger-text: #f97066;
+    --ok: #47cd89;
+    --border-subtle: #232327;
+    --border-default: #2e2e33;
+    --border-focus: #ffffff;
+    --nav-active: #222226;
+    --canvas-hover: #18181b;
+    --action-primary: #e6e6e6;
+    --action-primary-hover: #ffffff;
+    --action-primary-text: #08090a;
+    --btn-secondary-bg: #18181b;
+    --btn-secondary-ring: #2e2e33;
+    --tag-red-bg: #2a0f0d;
+    --tag-red: #fda29b;
+    --tag-red-ring: #55160c;
+    --tag-yellow-bg: #221905;
+    --tag-yellow: #fec84b;
+    --tag-yellow-ring: #4a3508;
+    --tag-gray-bg: #18181b;
+    --tag-gray: #d4d4d8;
+    --tag-gray-ring: #2e2e33;
+    --glass: rgb(24 24 27 / 0.72);
+    --glass-edge: rgb(255 255 255 / 0.08);
+    --phone-bg: #000000;
+    --phone-group: #1c1c1e;
+    --seg-on: #636366;
+    --avatar: #2e2e33;
+    --avatar-text: #d4d4d8;
+    --mark: #3b82f6;
+    color-scheme: dark;
+  }
+}
+
+/* Under 768 px the page is the iPhone-like grey, and groups are white (or dark grey). */
+@media (max-width: 767px) {
+  :root {
+    --page: var(--phone-bg);
+    --group: var(--phone-group);
+    --field: var(--phone-group);
+  }
+}
+@media (min-width: 768px) {
+  :root {
+    --page: var(--canvas);
+    --group: var(--surface-subtle);
+    --field: var(--surface);
+  }
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-page: var(--page);
+  --color-group: var(--group);
+  --color-field: var(--field);
+  --color-surface: var(--surface);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-surface-selected: var(--surface-selected);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-link: var(--link);
+  --color-danger-text: var(--danger-text);
+  --color-ok: var(--ok);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-default: var(--border-default);
+  --color-nav-active: var(--nav-active);
+  --color-canvas-hover: var(--canvas-hover);
+  --color-action-primary: var(--action-primary);
+  --color-glass: var(--glass);
+  --color-avatar: var(--avatar);
+  --color-avatar-text: var(--avatar-text);
+  --color-mark: var(--mark);
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@layer base {
+  html,
+  body {
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  @media (max-width: 767px) {
+    html,
+    body {
+      font-family: -apple-system, system-ui, sans-serif;
+      font-size: 17px;
+    }
+  }
+  :focus-visible {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+  }
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+  code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--surface-selected);
+    padding: 1px 6px;
+    border-radius: 6px;
+    color: var(--text-primary);
+  }
+}
+
+@layer components {
+  /* Pill buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 16px;
+    border-radius: 999px;
+    font-size: 14px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    text-decoration: none;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+  }
+  .btn-sm {
+    height: 30px;
+    font-size: 13px;
+    padding: 0 12px;
+  }
+  .btn-primary {
+    background: var(--action-primary);
+    color: var(--action-primary-text);
+  }
+  .btn-primary:not(:disabled):hover {
+    background: var(--action-primary-hover);
+  }
+  .btn-secondary {
+    background: var(--btn-secondary-bg);
+    color: var(--text-primary);
+    box-shadow: inset 0 0 0 1px var(--btn-secondary-ring);
+  }
+  .btn-secondary:not(:disabled):hover {
+    background: var(--canvas-hover);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-secondary);
+    box-shadow: inset 0 0 0 1px var(--btn-secondary-ring);
+  }
+  .btn-ghost:not(:disabled):hover,
+  .btn-plain:not(:disabled):hover {
+    background: var(--canvas-hover);
+    color: var(--text-primary);
+  }
+  .btn-plain {
+    background: transparent;
+    color: var(--text-secondary);
+    padding: 0 10px;
+  }
+  /* Phone pill and the big phone button */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: 999px;
+    font-size: 15px;
+    background: rgb(127 127 127 / 0.14);
+    color: var(--link);
+    text-decoration: none;
+  }
+  .pill-muted {
+    color: var(--text-secondary);
+  }
+  .bigbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    height: 50px;
+    border-radius: 999px;
+    font-size: 17px;
+    font-weight: 600;
+    background: var(--action-primary);
+    color: var(--action-primary-text);
+  }
+  .bigbtn:disabled {
+    opacity: 0.5;
+  }
+
+  /* Groups of content: grey panels on the laptop, white grouped rows on the phone */
+  .panel {
+    background: var(--group);
+    border-radius: 16px;
+  }
+
+  /* Tags */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    line-height: 18px;
+    white-space: nowrap;
+  }
+  .tag-gray {
+    background: var(--tag-gray-bg);
+    color: var(--tag-gray);
+    box-shadow: inset 0 0 0 1px var(--tag-gray-ring);
+  }
+  .tag-yellow {
+    background: var(--tag-yellow-bg);
+    color: var(--tag-yellow);
+    box-shadow: inset 0 0 0 1px var(--tag-yellow-ring);
+  }
+  .tag-red {
+    background: var(--tag-red-bg);
+    color: var(--tag-red);
+    box-shadow: inset 0 0 0 1px var(--tag-red-ring);
+  }
+  .tag-green {
+    background: color-mix(in srgb, var(--ok) 12%, transparent);
+    color: var(--ok);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 30%, transparent);
+  }
+
+  /* Inputs */
+  .field {
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--field);
+    box-shadow: inset 0 0 0 1px var(--border-default);
+    padding: 0 12px;
+    color: var(--text-primary);
+    font-size: 14px;
+  }
+  .field::placeholder {
+    color: var(--text-tertiary);
+  }
+  .field:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--border-focus);
+  }
+  textarea.field {
+    height: auto;
+    padding: 10px 12px;
+    line-height: 20px;
+    resize: vertical;
+  }
+  @media (max-width: 767px) {
+    .field {
+      height: 44px;
+      font-size: 17px;
+      border-radius: 12px;
+      box-shadow: none;
+    }
+    textarea.field {
+      line-height: 24px;
+    }
+    /* Inside a white (or dark grey) group, fields get the iOS grey fill so they stay visible. */
+    .panel .field {
+      background: rgb(118 118 128 / 0.12);
+    }
+  }
+
+  /* A draft: the take (highlighted, not editable here) above the editable draft */
+  .dbox {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    border-radius: 12px;
+    background: var(--field);
+    box-shadow: inset 0 0 0 1px var(--border-default);
+    padding: 12px 14px;
+    line-height: 21px;
+    font-size: 14px;
+  }
+  .dbox:focus-within {
+    box-shadow: inset 0 0 0 2px var(--border-focus);
+  }
+  .dbox textarea {
+    background: transparent;
+    resize: none;
+    outline: none;
+    width: 100%;
+    color: var(--text-primary);
+    min-height: 3lh;
+  }
+  .dbox textarea:read-only {
+    color: var(--text-secondary);
+  }
+  .take-mark {
+    background: color-mix(in srgb, var(--link) 12%, transparent);
+    border-radius: 4px;
+    padding: 0 2px;
+    margin-bottom: 1lh;
+    white-space: pre-wrap;
+    align-self: flex-start;
+  }
+  @media (max-width: 767px) {
+    .dbox {
+      font-size: 17px;
+      line-height: 24px;
+      box-shadow: none;
+      border-radius: 16px;
+      padding: 14px 16px;
+    }
+  }
+
+  /* The dark bar with Undo */
+  .undo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    height: 36px;
+    padding: 0 6px 0 14px;
+    border-radius: 999px;
+    background: var(--text-primary);
+    color: var(--canvas);
+    font-size: 13px;
+    width: 100%;
+  }
+  .undo button {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--canvas);
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 999px;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--canvas) 40%, transparent);
+  }
+  .undo.toast {
+    height: 52px;
+    font-size: 16px;
+    padding: 0 8px 0 20px;
+    box-shadow: 0 6px 24px rgb(0 0 0 / 0.3);
+  }
+  .undo.toast button {
+    font-size: 16px;
+    height: 38px;
+    padding: 0 16px;
+    box-shadow: none;
+    background: rgb(127 127 127 / 0.3);
+  }
+
+  /* Chips */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 6px 0 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    background: var(--field);
+    box-shadow: inset 0 0 0 1px var(--border-default);
+  }
+
+  /* Glass buttons and the tab bar on the phone */
+  .glass {
+    background: var(--glass);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+      inset 0 0 0 0.5px var(--glass-edge),
+      0 2px 12px rgb(0 0 0 / 0.12);
+  }
+
+  /* Rows inside a group, with an inset line between them */
+  .rows > * + * {
+    border-top: 1px solid var(--border-subtle);
+  }
+  @media (max-width: 767px) {
+    .rows > * {
+      position: relative;
+    }
+    .rows > * + * {
+      border-top: 0;
+    }
+    .rows > * + *::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      left: 16px;
+      border-top: 0.5px solid var(--border-default);
+    }
+  }
+
+  .seg {
+    display: inline-flex;
+    padding: 2px;
+    border-radius: 999px;
+    background: var(--surface-selected);
+    width: fit-content;
+  }
+  .seg button {
+    padding: 0 14px;
+    height: 30px;
+    border-radius: 999px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .seg button[aria-checked='true'] {
+    background: var(--surface);
+    color: var(--text-primary);
+    font-weight: 500;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+  }
+  .seg button:disabled {
+    opacity: 0.5;
+  }
+}

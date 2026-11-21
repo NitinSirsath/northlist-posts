@@ -1,0 +1,210 @@
+// NorthList Posts: your AI writes post ideas and sends them over MCP; you pick, edit and post.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String             @id @default(cuid())
+  email             String             @unique
+  name              String
+  createdAt         DateTime           @default(now())
+  sessions          Session[]
+  profile           Profile?
+  ideas             Idea[]
+  posts             Post[]
+  connections       SocialConnection[]
+  integrationTokens IntegrationToken[]
+  pushSubscriptions PushSubscription[]
+  shortLinks        ShortLink[]
+}
+
+/// A signed-in browser. Only the SHA-256 of the cookie value is stored.
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum Goal {
+  PROMOTE
+  NETWORK
+  JOB
+}
+
+/// What the AI reads before it writes (get_profile) and may fill during setup (save_profile).
+model Profile {
+  userId        String   @id
+  goal          Goal     @default(PROMOTE)
+  productName   String   @default("")
+  productUrl    String   @default("")
+  productLine   String   @default("")
+  interests     String[] @default([])
+  shippedFrom   String[] @default([])
+  postsPerDay   Int      @default(3)
+  repliesPerDay Int      @default(0)
+  useX          Boolean  @default(true)
+  useLinkedIn   Boolean  @default(true)
+  styleSamples  String[] @default([])
+  /// "you" or the name of the AI token that last saved it.
+  updatedBy     String   @default("you")
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum IdeaKind {
+  SHIPPED
+  NEWS
+  OWN
+  REPLY
+}
+
+enum IdeaStatus {
+  NEW
+  SKIPPED
+}
+
+/// One post idea from the AI, with an X text and/or a LinkedIn text.
+model Idea {
+  id              String      @id @default(cuid())
+  userId          String
+  kind            IdeaKind
+  title           String
+  why             String      @default("")
+  sourceUrl       String?
+  sourceName      String?
+  mentionsProduct Boolean     @default(false)
+  replyToUrl      String?
+  replyToAuthor   String?
+  replyToText     String?
+  xText           String?
+  linkedinText    String?
+  take            String      @default("")
+  status          IdeaStatus  @default(NEW)
+  /// When "Copy and open" was last used on a reply draft.
+  copiedAt        DateTime?
+  /// Name of the AI token that sent it.
+  fromAi          String
+  /// Same idea sent twice is kept once.
+  dedupeKey       String
+  createdAt       DateTime    @default(now())
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts           Post[]
+  shortLinks      ShortLink[]
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, createdAt])
+}
+
+enum Channel {
+  X
+  LINKEDIN
+}
+
+enum PostStatus {
+  WAITING
+  SENDING
+  POSTED
+  FAILED
+  CANCELLED
+}
+
+/// One post to one channel. It waits 10 seconds (Undo) before it is sent.
+model Post {
+  id        String     @id @default(cuid())
+  userId    String
+  ideaId    String
+  channel   Channel
+  text      String
+  status    PostStatus @default(WAITING)
+  sendAt    DateTime
+  postedAt  DateTime?
+  url       String?
+  error     String?
+  createdAt DateTime   @default(now())
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  idea      Idea       @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  @@index([status, sendAt])
+  @@index([userId, createdAt])
+}
+
+/// A connected X or LinkedIn account. Tokens are encrypted (AES-256-GCM).
+model SocialConnection {
+  id              String    @id @default(cuid())
+  userId          String
+  channel         Channel
+  accountId       String
+  accountName     String
+  accessTokenEnc  String
+  refreshTokenEnc String?
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channel])
+}
+
+/// MCP tokens for the user's AI. Only the SHA-256 hash and a display prefix are stored.
+model IntegrationToken {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  tokenHash     String    @unique
+  displayPrefix String
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime
+  lastUsedAt    DateTime?
+  revokedAt     DateTime?
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Our short link for a product link in one channel's text; counts clicks.
+model ShortLink {
+  code      String   @id
+  userId    String
+  ideaId    String
+  channel   Channel
+  targetUrl String
+  clicks    Int      @default(0)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  idea      Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  @@index([ideaId])
+}
+
+/// Short-lived OAuth state for connecting X or LinkedIn (PKCE verifier included).
+model OAuthState {
+  state     String   @id
+  userId    String?
+  purpose   String
+  verifier  String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
