@@ -35,5 +35,5 @@ export function groupToday(ideas: IdeaView[], now = Date.now()): TodayGroups {
   };
 }
 
-/** The draft to open when none is picked: the newest one still to post, else the newest one done. */
+/** The draft to open when none is picked: the newest one still to post, else the newest done one. */
 export const firstOf = (groups: TodayGroups) => groups.fresh[0] ?? groups.earlier[0] ?? groups.done[0];
