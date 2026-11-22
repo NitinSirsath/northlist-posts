@@ -94,7 +94,7 @@ const decode = (text: string) =>
     .replace(/\s+/g, ' ')
     .trim();
 
-const clip = (text: string, max: number) => (text.length > max ? \`${text.slice(0, max - 1).trimEnd()}…\` : text);
+const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
 
 function metaContent(html: string, key: string) {
   const tags = html.match(/<meta\b[^>]*>/gi) ?? [];
@@ -163,9 +163,9 @@ export function githubParts(url: URL) {
 }
 
 async function readGitHub(owner: string, repo: string | null, deps: ReaderDeps): Promise<ReadLink> {
-  const url = repo ? \`https://github.com/${owner}/${repo}\` : \`https://github.com/${owner}\`;
+  const url = repo ? `https://github.com/${owner}/${repo}` : `https://github.com/${owner}`;
   const kind: LinkKind = repo ? 'GITHUB_REPO' : 'GITHUB_PROFILE';
-  const api = repo ? \`https://api.github.com/repos/${owner}/${repo}\` : \`https://api.github.com/users/${owner}\`;
+  const api = repo ? `https://api.github.com/repos/${owner}/${repo}` : `https://api.github.com/users/${owner}`;
   try {
     const res = await deps.fetch(api, {
       headers: { 'User-Agent': HEADERS['User-Agent'], Accept: 'application/vnd.github+json' },
