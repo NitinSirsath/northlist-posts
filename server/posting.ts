@@ -38,7 +38,7 @@ export async function requestPost(userId: string, ideaId: string, input: unknown
     throw new AppError(400, 'TOO_LONG', `The X post is over ${X_MAX} characters with your take. Shorten it first.`);
   if (channel === 'LINKEDIN' && text.length > LINKEDIN_MAX)
     throw new AppError(400, 'TOO_LONG', `The LinkedIn post is over ${LINKEDIN_MAX} characters.`);
-  await requireConnection(userId, channel);
+  await requireConnection(userId, idea.spaceId, channel);
   const active = idea.posts.find((p) => p.channel === channel && ['WAITING', 'SENDING', 'POSTED'].includes(p.status));
   if (active) throw new AppError(409, 'ALREADY_POSTED', 'This is already posted or on its way.');
   const post = await prisma.post.create({
@@ -78,10 +78,14 @@ async function claimDue(now: Date, limit = 10) {
 }
 
 async function sendOne(postId: string, now: Date) {
-  const post = await prisma.post.findUniqueOrThrow({ where: { id: postId } });
+  const post = await prisma.post.findUniqueOrThrow({
+    where: { id: postId },
+    include: { idea: { select: { spaceId: true } } },
+  });
   try {
-    const connection = await prisma.socialConnection.findUnique({
-      where: { userId_channel: { userId: post.userId, channel: post.channel } },
+    // The account of the draft's own space: a draft never goes out from another space's account.
+    const connection = await prisma.socialConnection.findFirst({
+      where: { userId: post.userId, spaceId: post.idea.spaceId, channel: post.channel },
     });
     if (!connection) throw new SocialError('reconnect', `${label(post.channel)} is not connected any more.`);
     const token = await accessTokenFor(connection, now);
