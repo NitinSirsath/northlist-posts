@@ -8,12 +8,13 @@ import { IdeaEditSchema, IdeaView, PostView, SubmitDraftsSchema, SubmitIdea } fr
 import { config } from './config.js';
 import { prisma } from './db.js';
 import { AppError } from './errors.js';
-import { getProfile } from './profile.js';
 import { sha256 } from './secrets.js';
+import { resolveSpace } from './spaces.js';
 
 const DAY_MS = 86_400_000;
 /** Ideas older than this leave Today. */
 export const TODAY_DAYS = 3;
+export const TODAY_SINCE = (now: Date) => new Date(now.getTime() - TODAY_DAYS * DAY_MS);
 const URL_PATTERN = /https?:\/\/[^\s<>"')\]]+/g;
 const CODE_ALPHABET = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -39,6 +40,7 @@ export function toPostView(post: Post, links: ShortLink[]): PostView {
 export function toIdeaView(row: IdeaRow): IdeaView {
   return {
     id: row.id,
+    spaceId: row.spaceId,
     kind: row.kind,
     title: row.title,
     why: row.why,
@@ -95,11 +97,15 @@ export interface SubmitResult {
   results: { title: string; result: 'created' | 'already_sent'; id: string }[];
 }
 
-export async function submitDrafts(userId: string, fromAi: string, input: unknown): Promise<SubmitResult> {
-  const { ideas } = SubmitDraftsSchema.parse(input);
-  const profile = await getProfile(userId);
-  const productHost = profile.productUrl ? hostOf(profile.productUrl) : null;
-  const productName = profile.productName.trim().toLowerCase();
+export async function submitDrafts(
+  userId: string,
+  fromAi: string,
+  input: unknown,
+): Promise<SubmitResult & { space: string }> {
+  const { ideas, space: spaceId } = SubmitDraftsSchema.parse(input);
+  const space = await resolveSpace(userId, spaceId);
+  const productHost = space.productUrl ? hostOf(space.productUrl) : null;
+  const productName = space.productName.trim().toLowerCase();
   const results: SubmitResult['results'] = [];
   for (const idea of ideas) {
     const dedupeKey = dedupeKeyOf(idea);
@@ -117,6 +123,7 @@ export async function submitDrafts(userId: string, fromAi: string, input: unknow
       const row = await prisma.idea.create({
         data: {
           userId,
+          spaceId: space.id,
           kind: idea.kind,
           title: idea.title,
           why: idea.why ?? '',
@@ -147,14 +154,14 @@ export async function submitDrafts(userId: string, fromAi: string, input: unknow
       } else throw err;
     }
   }
-  return { created: results.filter((r) => r.result === 'created').length, results };
+  return { space: space.name, created: results.filter((r) => r.result === 'created').length, results };
 }
 
 const withPosts = { posts: true, shortLinks: true } as const;
 
-export async function listToday(userId: string, now = new Date()) {
+export async function listToday(userId: string, spaceId: string, now = new Date()) {
   const rows = await prisma.idea.findMany({
-    where: { userId, status: 'NEW', createdAt: { gte: new Date(now.getTime() - TODAY_DAYS * DAY_MS) } },
+    where: { userId, spaceId, status: 'NEW', createdAt: { gte: TODAY_SINCE(now) } },
     include: withPosts,
     orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
   });
@@ -191,10 +198,10 @@ export async function markCopied(userId: string, id: string, now = new Date()) {
 }
 
 /** For the AI (get_recent_posts): what went out lately and what is still waiting, so it does not repeat. */
-export async function recentForAi(userId: string, now = new Date()) {
+export async function recentForAi(userId: string, spaceId: string, now = new Date()) {
   const [posts, waiting, sentToday] = await Promise.all([
     prisma.post.findMany({
-      where: { userId, status: 'POSTED' },
+      where: { userId, status: 'POSTED', idea: { spaceId } },
       include: {
         idea: { select: { title: true, kind: true, shortLinks: { select: { code: true, targetUrl: true } } } },
       },
@@ -204,8 +211,9 @@ export async function recentForAi(userId: string, now = new Date()) {
     prisma.idea.findMany({
       where: {
         userId,
+        spaceId,
         status: 'NEW',
-        createdAt: { gte: new Date(now.getTime() - TODAY_DAYS * DAY_MS) },
+        createdAt: { gte: TODAY_SINCE(now) },
         posts: { none: { status: { in: ['WAITING', 'SENDING', 'POSTED'] } } },
       },
       select: { title: true, kind: true, createdAt: true },
@@ -214,7 +222,7 @@ export async function recentForAi(userId: string, now = new Date()) {
     }),
     prisma.idea.groupBy({
       by: ['kind'],
-      where: { userId, createdAt: { gte: new Date(now.getTime() - 20 * 3_600_000) } },
+      where: { userId, spaceId, createdAt: { gte: new Date(now.getTime() - 20 * 3_600_000) } },
       _count: true,
     }),
   ]);
