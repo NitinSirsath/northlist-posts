@@ -14,7 +14,7 @@ const NAV: { to: Path; label: string; icon: LucideIcon }[] = [
   { to: '/', label: 'Today', icon: Sun },
   { to: '/posted', label: 'Posted', icon: Send },
   { to: '/space', label: 'Space', icon: LayoutGrid },
-  { to: '/connect', label: 'Connect', icon: Plug }
+  { to: '/connect', label: 'Connect', icon: Plug },
 ];
 
 const titleOf = (path: string) =>
