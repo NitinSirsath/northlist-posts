@@ -9,6 +9,7 @@ import { ChevronRight, Sparkles } from 'lucide-react';
 import type { IdeaView } from '../../shared/contracts';
 import { ChannelMark } from '../components/brand';
 import { DraftEditor, KIND_ICON } from '../components/DraftEditor';
+import { TitleSwitcher } from '../components/SpaceSwitcher';
 import { Avatar, LoadError, Loading, Page } from '../components/ui';
 import { kindShort, timeAgo, when } from '../lib/format';
 import { useIsPhone } from '../lib/hooks';
@@ -37,7 +38,7 @@ export function TodayPage({ draft }: { draft?: string }) {
   if (today.isPending || (today.isError && !today.data) || !ideas.length || phone)
     return (
       <Page
-        title="Today"
+        title={phone ? <TitleSwitcher /> : 'Today'}
         subtitle={fromLine(ideas) ?? 'Drafts from your AI. Nothing is posted until you tap Post.'}
         phoneBar={phone && <PhoneAvatarButton />}
       >
@@ -157,8 +158,8 @@ function EmptyToday() {
     <div className="panel flex flex-col items-center gap-2.5 px-6 py-12 text-center text-text-secondary">
       <b className="text-base text-text-primary">No drafts yet today</b>
       <span>
-        Open your AI in the NorthList Posts folder and type <code>daily</code>. Drafts show up here in a few minutes,
-        with an alert.
+        Open your AI in the NorthList Posts folder and type <code>daily</code>. Drafts for this space show up here in a
+        few minutes, with an alert.
       </span>
     </div>
   );
@@ -170,8 +171,8 @@ function PhoneAvatarButton() {
   const me = useMe();
   return (
     <Link
-      to="/profile"
-      aria-label="Profile"
+      to="/space"
+      aria-label="Space settings"
       className="glass ml-auto inline-flex size-10 items-center justify-center rounded-full"
     >
       <Avatar name={me.data?.name || me.data?.email || '?'} size={32} />
