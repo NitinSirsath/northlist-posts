@@ -12,9 +12,19 @@ import { editIdea, listToday, markCopied, skipIdea } from './ideas.js';
 import { createMcpRouter } from './mcp/router.js';
 import { followShortLink, postedSummary } from './posted.js';
 import { requestPost, undoPost } from './posting.js';
-import { getProfile, saveProfile } from './profile.js';
+import { onboardingOf, saveOnboarding } from './onboarding.js';
 import { subscribe, unsubscribe } from './push.js';
-import { API_PER_MINUTE, LINK_PER_MINUTE, SIGN_IN_PER_MINUTE, limiter } from './rateLimits.js';
+import { API_PER_MINUTE, LINK_PER_MINUTE, LINK_READS_PER_MINUTE, SIGN_IN_PER_MINUTE, limiter } from './rateLimits.js';
+import {
+  addLink,
+  createSpace,
+  deleteSpace,
+  findSpace,
+  getSpace,
+  listSpaces,
+  removeLink,
+  updateSpace,
+} from './spaces.js';
 import { createToken, listTokens, revokeToken } from './tokens.js';
 
 type Handler = (req: Request, res: Response) => Promise<unknown>;
@@ -25,6 +35,9 @@ const json =
     res.json(await fn(req, res));
   };
 const id = (req: Request) => String(req.params.id);
+/** The space a page asks about (?space=id); it must be the user's own. */
+const spaceOf = async (req: Request, res: Response) =>
+  (await findSpace(userOf(res).id, String(req.query.space ?? ''))).id;
 
 /** Cookies are SameSite=Lax; changes also need a JSON body, which a form on another site cannot send. */
 function jsonOnlyForChanges(req: Request, _res: Response, next: NextFunction) {
@@ -52,20 +65,26 @@ function apiRouter() {
     '/me',
     json(async (_req, res) => {
       const c = config();
+      const user = userOf(res);
       const me: MeView = {
-        ...userOf(res),
+        ...user,
         mcpUrl: `${c.publicUrl}/mcp`,
         kitUrl: c.kitUrl,
         vapidPublicKey: c.vapid?.publicKey ?? null,
         fakeSocial: c.fakeSocial,
+        ...(await onboardingOf(user.id)),
       };
       return me;
     }),
   );
+  api.put(
+    '/onboarding',
+    json((req, res) => saveOnboarding(userOf(res).id, req.body)),
+  );
 
   api.get(
     '/ideas/today',
-    json((_req, res) => listToday(userOf(res).id)),
+    json(async (req, res) => listToday(userOf(res).id, await spaceOf(req, res))),
   );
   api.patch(
     '/ideas/:id',
@@ -89,16 +108,37 @@ function apiRouter() {
   );
   api.get(
     '/posted',
-    json((_req, res) => postedSummary(userOf(res).id)),
+    json(async (req, res) => postedSummary(userOf(res).id, await spaceOf(req, res))),
   );
 
   api.get(
-    '/profile',
-    json((_req, res) => getProfile(userOf(res).id)),
+    '/spaces',
+    json((_req, res) => listSpaces(userOf(res).id)),
   );
-  api.put(
-    '/profile',
-    json((req, res) => saveProfile(userOf(res).id, req.body, 'you')),
+  api.post(
+    '/spaces',
+    json((req, res) => createSpace(userOf(res).id, req.body)),
+  );
+  api.get(
+    '/spaces/:id',
+    json((req, res) => getSpace(userOf(res).id, id(req))),
+  );
+  api.patch(
+    '/spaces/:id',
+    json((req, res) => updateSpace(userOf(res).id, id(req), req.body, 'you')),
+  );
+  api.delete(
+    '/spaces/:id',
+    json((req, res) => deleteSpace(userOf(res).id, id(req))),
+  );
+  api.post(
+    '/spaces/:id/links',
+    limiter({ limit: LINK_READS_PER_MINUTE, keyGenerator: (_req, res) => `links:${userOf(res).id}` }),
+    json((req, res) => addLink(userOf(res).id, id(req), req.body)),
+  );
+  api.delete(
+    '/spaces/:id/links/:linkId',
+    json((req, res) => removeLink(userOf(res).id, id(req), String(req.params.linkId))),
   );
 
   api.get(
@@ -108,8 +148,8 @@ function apiRouter() {
   api.get('/connect/:channel/start', connectStart);
   api.get('/connect/:channel/callback', connectCallback);
   api.delete(
-    '/connections/:channel',
-    json((req, res) => removeConnection(userOf(res).id, req.params.channel)),
+    '/spaces/:id/connections/:channel',
+    json((req, res) => removeConnection(userOf(res).id, id(req), req.params.channel)),
   );
 
   api.get(
