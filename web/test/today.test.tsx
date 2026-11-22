@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { idea, me, mockApi, post, profile, renderApp } from './utils';
+import { idea, me, mockApi, post, renderApp, space } from './utils';
 
 describe('Today', () => {
   it('lists drafts as New, Earlier and Posted with X and LinkedIn logos, and opens the picked one', async () => {
@@ -8,8 +8,8 @@ describe('Today', () => {
     const posted = post({ channel: 'X', status: 'POSTED', postedAt: new Date().toISOString() });
     mockApi({
       'GET /api/me': me,
-      'GET /api/profile': profile,
-      'GET /api/ideas/today': [
+      'GET /api/spaces': [space],
+      'GET /api/ideas/today?space=sp1': [
         idea({
           id: 'n1',
           kind: 'NEWS',
@@ -57,7 +57,7 @@ describe('Today', () => {
   });
 
   it('shows the empty state when the AI sent nothing', async () => {
-    mockApi({ 'GET /api/me': me, 'GET /api/profile': profile, 'GET /api/ideas/today': [] });
+    mockApi({ 'GET /api/me': me, 'GET /api/spaces': [space], 'GET /api/ideas/today?space=sp1': [] });
     renderApp('/');
     expect(await screen.findByText('No drafts yet today')).toBeInTheDocument();
   });
@@ -66,8 +66,8 @@ describe('Today', () => {
     const draft = 'a'.repeat(270);
     mockApi({
       'GET /api/me': me,
-      'GET /api/profile': profile,
-      'GET /api/ideas/today': [idea({ title: 'Long one', take: 'abc', xText: draft })],
+      'GET /api/spaces': [space],
+      'GET /api/ideas/today?space=sp1': [idea({ title: 'Long one', take: 'abc', xText: draft })],
       'PATCH /api/ideas/idea-x': {},
     });
     renderApp('/');
@@ -94,8 +94,8 @@ describe('Today', () => {
     const item = idea({ title: 'Waiting one', posts: [waiting] });
     const calls = mockApi({
       'GET /api/me': me,
-      'GET /api/profile': profile,
-      'GET /api/ideas/today': () => [item],
+      'GET /api/spaces': [space],
+      'GET /api/ideas/today?space=sp1': () => [item],
       'POST /api/posts/p1/undo': () => {
         item.posts = [{ ...waiting, status: 'CANCELLED' }];
         return { ok: true };
@@ -119,8 +119,8 @@ describe('Today', () => {
     const waiting = post({ id: 'p2', status: 'WAITING' });
     mockApi({
       'GET /api/me': me,
-      'GET /api/profile': profile,
-      'GET /api/ideas/today': [idea({ posts: [waiting] })],
+      'GET /api/spaces': [space],
+      'GET /api/ideas/today?space=sp1': [idea({ posts: [waiting] })],
       'POST /api/posts/p2/undo': {
         status: 409,
         body: { error: { code: 'TOO_LATE', message: 'Too late to undo: it was already sent.' } },
@@ -134,8 +134,8 @@ describe('Today', () => {
   it('shows "Connect X first" when X is not connected', async () => {
     mockApi({
       'GET /api/me': me,
-      'GET /api/profile': profile,
-      'GET /api/ideas/today': [idea({ id: 'i9' })],
+      'GET /api/spaces': [space],
+      'GET /api/ideas/today?space=sp1': [idea({ id: 'i9' })],
       'POST /api/ideas/i9/post': {
         status: 409,
         body: { error: { code: 'NOT_CONNECTED', message: 'Connect X first, on Connect.' } },
@@ -143,7 +143,7 @@ describe('Today', () => {
     });
     renderApp('/');
     fireEvent.click(await screen.findByRole('button', { name: 'Post to X' }));
-    expect(await screen.findByText(/Connect X first/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Go to Connect' })).toHaveAttribute('href', '/connect');
+    expect(await screen.findByText(/Connect X to this space first/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Go to Space' })).toHaveAttribute('href', '/space');
   });
 });
