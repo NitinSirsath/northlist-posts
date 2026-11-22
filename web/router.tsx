@@ -15,7 +15,9 @@ import { PostPage } from './pages/PostPage';
 import { PostedPage } from './pages/Posted';
 import { ProfilePage } from './pages/Profile';
 import { SignInPage } from './pages/SignIn';
+import { SpacePage, type SpaceSearch } from './pages/Space';
 import { TodayPage } from './pages/Today';
+import { WelcomePage, type WelcomeSearch } from './pages/Welcome';
 import { useMe } from './queries';
 
 const text = (value: unknown) => (typeof value === 'string' && value ? value : undefined);
@@ -37,11 +39,35 @@ const signInRoute = createRoute({
   },
 });
 
+const one = (value: unknown) => (value === 1 || value === '1' ? 1 : undefined);
+
+/** The first-run steps: full screen, no side menu. Also "New space" (?new=1). */
+const welcomeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/welcome',
+  validateSearch: (search: Record<string, unknown>): WelcomeSearch => ({
+    channel: text(search.channel),
+    connected: one(search.connected),
+    error: text(search.error),
+    new: one(search.new),
+  }),
+  component: function WelcomeRoute() {
+    const search = welcomeRoute.useSearch();
+    const me = useMe();
+    if (me.isPending) return <div role="status" aria-label="Loading" className="min-h-dvh" />;
+    if (!me.data) return <SignInPage />;
+    const making = search.new === 1 || Boolean(sessionStorage.getItem('nlp.newSpace'));
+    if (me.data.onboarded && !making) return <Navigate to="/" replace />;
+    return <WelcomePage me={me.data} search={search} />;
+  },
+});
+
 const appRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: 'app',
   component: function AppLayout() {
     const me = useMe();
+    if (me.data && !me.data.onboarded) return <Navigate to="/welcome" replace />;
     if (me.data) return <Shell me={me.data} />;
     if (me.isPending) return <div role="status" aria-label="Loading" className="min-h-dvh" />;
     if (isApiError(me.error) && me.error.status === 401) return <SignInPage />;
@@ -73,6 +99,19 @@ const postRoute = createRoute({
 });
 
 const postedRoute = createRoute({ getParentRoute: () => appRoute, path: '/posted', component: PostedPage });
+const spaceRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/space',
+  validateSearch: (search: Record<string, unknown>): SpaceSearch => ({
+    channel: text(search.channel),
+    connected: one(search.connected),
+    error: text(search.error),
+  }),
+  component: function SpaceRoute() {
+    return <SpacePage search={spaceRoute.useSearch()} />;
+  },
+});
+/** The old Profile page's address. */
 const profileRoute = createRoute({ getParentRoute: () => appRoute, path: '/profile', component: ProfilePage });
 
 const connectRoute = createRoute({
@@ -90,7 +129,8 @@ const connectRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   signInRoute,
-  appRoute.addChildren([todayRoute, postRoute, postedRoute, profileRoute, connectRoute]),
+  welcomeRoute,
+  appRoute.addChildren([todayRoute, postRoute, postedRoute, spaceRoute, profileRoute, connectRoute]),
 ]);
 
 export function createAppRouter(history?: RouterHistory) {
