@@ -33,15 +33,13 @@ const cookieOptions = () => ({
 
 export const isOwnerEmail = (email: string) => config().ownerEmails.includes(email.trim().toLowerCase());
 
-/** Finds or makes the user and their empty profile. */
+/** Finds or makes the user. A new user has no space yet: the first-run steps make the first one. */
 export async function upsertOwner(email: string, name: string) {
-  const user = await prisma.user.upsert({
+  return prisma.user.upsert({
     where: { email: email.toLowerCase() },
     update: { name },
     create: { email: email.toLowerCase(), name },
   });
-  await prisma.profile.upsert({ where: { userId: user.id }, update: {}, create: { userId: user.id } });
-  return user;
 }
 
 export async function startSession(res: Response, userId: string, now = new Date()) {
@@ -96,12 +94,13 @@ export async function saveOAuthState(purpose: string, verifier: string, userId: 
 }
 
 /** One use only: the row is deleted as it is read. */
-export async function takeOAuthState(state: unknown, purpose: string) {
+export async function takeOAuthState(state: unknown, purpose: string | ((purpose: string) => boolean)) {
   if (typeof state !== 'string' || state.length > 100) return null;
   const row = await prisma.oAuthState.findUnique({ where: { state } });
   if (!row) return null;
   await prisma.oAuthState.delete({ where: { state } });
-  if (row.purpose !== purpose || row.expiresAt < new Date()) return null;
+  const matches = typeof purpose === 'string' ? row.purpose === purpose : purpose(row.purpose);
+  if (!matches || row.expiresAt < new Date()) return null;
   return row;
 }
 

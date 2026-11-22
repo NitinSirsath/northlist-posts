@@ -41,6 +41,17 @@
   --avatar: #e4e4e7;
   --avatar-text: #3f3f46;
   --mark: #2563eb;
+  /* Soft tints for the first-run pictures and topic tiles (no blue). */
+  --tint-sand: #efe4d2;
+  --tint-sage: #dbe6d6;
+  --tint-lilac: #e4ddf0;
+  --tint-rose: #f1dcdc;
+  --tint-stone: #e4e1db;
+  --tint-mint: #d5e9e0;
+  --tint-peach: #f4e0d0;
+  --tint-olive: #e4e4cf;
+  --stage: #f4f3f0;
+  --art: #18181b;
   color-scheme: light;
 }
 
@@ -83,6 +94,16 @@
     --avatar: #2e2e33;
     --avatar-text: #d4d4d8;
     --mark: #3b82f6;
+    --tint-sand: #2a241b;
+    --tint-sage: #1d261c;
+    --tint-lilac: #231f2c;
+    --tint-rose: #2b1d1e;
+    --tint-stone: #232220;
+    --tint-mint: #18261f;
+    --tint-peach: #2c2119;
+    --tint-olive: #25251a;
+    --stage: #141416;
+    --art: #ededef;
     color-scheme: dark;
   }
 }
@@ -475,5 +496,378 @@
   }
   .seg button:disabled {
     opacity: 0.5;
+  }
+}
+
+/* ── First-run steps and the Space page (owner, 22 Nov 2026) ───────────────── */
+@layer components {
+  .pick {
+    position: relative;
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--border-default);
+    text-align: left;
+    transition:
+      transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      box-shadow 200ms;
+  }
+  .pick[aria-checked='true'],
+  .pick[aria-pressed='true'] {
+    box-shadow: inset 0 0 0 2px var(--text-primary);
+  }
+  .pick:not(:disabled):active {
+    transform: scale(0.96);
+  }
+  .pick-check {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: inline-flex;
+    width: 22px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--text-primary);
+    color: var(--canvas);
+  }
+  .tile {
+    position: relative;
+    overflow: hidden;
+    height: 92px;
+    border-radius: 14px;
+    text-align: left;
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.04);
+    transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .tile:hover {
+    transform: scale(1.02);
+  }
+  .tile:active {
+    transform: scale(0.96);
+  }
+  .tile[aria-pressed='true'] {
+    box-shadow: inset 0 0 0 2px var(--text-primary);
+  }
+  .tile svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .tile > .tile-label {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    left: 10px;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--text-primary);
+  }
+  .stage {
+    position: relative;
+    overflow: hidden;
+    background: var(--stage);
+  }
+  .card-float {
+    border-radius: 20px;
+    background: var(--surface);
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.05),
+      0 8px 24px rgb(0 0 0 / 0.06),
+      inset 0 0 0 1px var(--border-subtle);
+  }
+  .progress-line {
+    display: flex;
+    gap: 5px;
+  }
+  .progress-line i {
+    position: relative;
+    flex: 1;
+    height: 3px;
+    overflow: hidden;
+    border-radius: 3px;
+    background: var(--border-default);
+  }
+  .progress-line i.done::after,
+  .progress-line i.now::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--text-primary);
+    transform-origin: left;
+  }
+  .progress-line i.now::after {
+    opacity: 0.55;
+  }
+  .shimmer {
+    background: linear-gradient(90deg, var(--text-tertiary) 0%, var(--text-primary) 50%, var(--text-tertiary) 100%);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .skel {
+    border-radius: 6px;
+    background: linear-gradient(
+      90deg,
+      var(--surface-subtle) 0%,
+      var(--surface-selected) 50%,
+      var(--surface-subtle) 100%
+    );
+    background-size: 200% 100%;
+  }
+  .welcome-step {
+    view-transition-name: welcome-step;
+  }
+}
+
+/* Motion: only for people who have not asked for less. */
+@media (prefers-reduced-motion: no-preference) {
+  .stagger > * {
+    animation: rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation-delay: calc(var(--sibling-index, 1) * 40ms + 60ms);
+  }
+  @supports (animation-delay: calc(sibling-index() * 0.1s)) {
+    .stagger > * {
+      animation-delay: calc(sibling-index() * 40ms + 60ms);
+    }
+  }
+  .pop-in {
+    animation: pop 0.32s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  }
+  .bump {
+    animation: bump 0.38s cubic-bezier(0.3, 1.5, 0.5, 1);
+  }
+  .swap-in {
+    animation: swap 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .progress-line i.now::after {
+    animation: grow 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .shimmer,
+  .skel {
+    animation: shimmer 1.4s linear infinite;
+  }
+  .pulse-ring {
+    position: relative;
+  }
+  .pulse-ring::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 999px;
+    border: 1.5px solid var(--text-tertiary);
+    animation: ring 1.6s ease-out infinite;
+  }
+  .burst::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 999px;
+    border: 2px solid var(--ok);
+    animation: burst 0.7s ease-out both;
+  }
+  .goal-art .bar {
+    transform-box: fill-box;
+    transform-origin: center bottom;
+  }
+  .goal-art .node {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  [aria-checked='true'] > .goal-art.fresh .bar {
+    animation: bar-up 0.7s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+    animation-delay: calc(var(--d, 0) * 90ms);
+  }
+  [aria-checked='true'] > .goal-art.fresh .draw {
+    stroke-dasharray: 220;
+    animation: draw 0.9s 0.15s ease both;
+  }
+  [aria-checked='true'] > .goal-art.fresh .node {
+    animation: pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+    animation-delay: calc(var(--d, 0) * 70ms);
+  }
+  .flow-card {
+    animation: flow-in 6s cubic-bezier(0.2, 0.8, 0.2, 1) infinite both;
+  }
+  .flow-tick {
+    animation: tick 6s infinite both;
+  }
+  .typing::after {
+    content: '';
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    margin-left: 2px;
+    vertical-align: -2px;
+    background: var(--text-primary);
+    animation: caret 0.8s steps(1) infinite;
+  }
+  .week-dot {
+    animation: pop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+@keyframes bump {
+  40% {
+    transform: scale(0.93);
+  }
+}
+@keyframes swap {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(6px);
+  }
+}
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes ring {
+  from {
+    opacity: 1;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+@keyframes burst {
+  from {
+    opacity: 1;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+@keyframes bar-up {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes draw {
+  from {
+    stroke-dashoffset: 220;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes flow-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.96);
+  }
+  8%,
+  85% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes tick {
+  0%,
+  45% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  52%,
+  90% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Step changes slide the way you move (view transitions, where the browser has them). */
+::view-transition-group(welcome-step) {
+  animation-duration: 0.45s;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes vt-out-left {
+  to {
+    opacity: 0;
+    transform: translateX(-36px);
+  }
+}
+@keyframes vt-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(36px);
+  }
+}
+@keyframes vt-out-right {
+  to {
+    opacity: 0;
+    transform: translateX(36px);
+  }
+}
+@keyframes vt-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-36px);
+  }
+}
+html:active-view-transition-type(forward)::view-transition-old(welcome-step) {
+  animation: vt-out-left 0.3s ease both;
+}
+html:active-view-transition-type(forward)::view-transition-new(welcome-step) {
+  animation: vt-in-right 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+html:active-view-transition-type(backward)::view-transition-old(welcome-step) {
+  animation: vt-out-right 0.3s ease both;
+}
+html:active-view-transition-type(backward)::view-transition-new(welcome-step) {
+  animation: vt-in-left 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sheet-up {
+    animation: sheet-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
   }
 }

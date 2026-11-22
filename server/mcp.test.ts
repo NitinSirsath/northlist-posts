@@ -57,7 +57,7 @@ describe('MCP endpoint', () => {
   });
 
   it('saves the profile and shows which AI changed it', async () => {
-    const { user, agent } = await signedIn();
+    const { user, agent, space } = await signedIn();
     const token = await aiToken(user.id, 'Claude Code');
     const saved = toolResult(
       await callTool(token, 'save_profile', {
@@ -68,7 +68,7 @@ describe('MCP endpoint', () => {
       }),
     );
     expect(saved.isError).toBe(false);
-    const profile = (await agent.get('/api/profile').expect(200)).body;
+    const profile = (await agent.get(`/api/spaces/${space.id}`).expect(200)).body;
     expect(profile).toMatchObject({
       productName: 'NorthList',
       interests: ['React', 'Job search'],
@@ -81,13 +81,13 @@ describe('MCP endpoint', () => {
   });
 
   it('submits drafts to Today, once', async () => {
-    const { user, agent } = await signedIn();
+    const { user, agent, space } = await signedIn();
     const token = await aiToken(user.id);
     const first = toolResult(await callTool(token, 'submit_drafts', { ideas: [news()] }));
     expect(first.data).toMatchObject({ created: 1, results: [{ result: 'created' }] });
     const again = toolResult(await callTool(token, 'submit_drafts', { ideas: [news()] }));
     expect(again.data).toMatchObject({ created: 0, results: [{ result: 'already_sent' }] });
-    const today = (await agent.get('/api/ideas/today').expect(200)).body;
+    const today = (await agent.get(`/api/ideas/today?space=${space.id}`).expect(200)).body;
     expect(today).toHaveLength(1);
     expect(today[0]).toMatchObject({ kind: 'NEWS', title: 'React compiler release', fromAi: 'Claude Code', posts: [] });
   });
@@ -128,7 +128,7 @@ describe('MCP endpoint', () => {
   });
 
   it('turns product links into counted short links, one per channel', async () => {
-    const { user, agent } = await signedIn();
+    const { user, agent, space } = await signedIn();
     const token = await aiToken(user.id);
     await callTool(token, 'save_profile', { productName: 'NorthList', productUrl: 'https://northlist.site' });
     await callTool(token, 'submit_drafts', {
@@ -141,7 +141,7 @@ describe('MCP endpoint', () => {
         },
       ],
     });
-    const [idea] = (await agent.get('/api/ideas/today')).body;
+    const [idea] = (await agent.get(`/api/ideas/today?space=${space.id}`)).body;
     expect(idea.mentionsProduct).toBe(true);
     expect(idea.xText).toMatch(/^Try it: https:\/\/posts\.example\.com\/r\/[A-Za-z0-9]{7}$/);
     expect(idea.linkedinText).toMatch(/https:\/\/posts\.example\.com\/r\/[A-Za-z0-9]{7}$/);
@@ -163,8 +163,8 @@ describe('MCP endpoint', () => {
       sentInLast20Hours: { NEWS: 1 },
     });
     const profile = toolResult(await callTool(token, 'get_profile'));
-    expect(profile.data).toMatchObject({ profile: { postsPerDay: 3 }, connectedChannels: [] });
-    expect(profile.data).not.toHaveProperty('profile.repliesPerDay');
+    expect(profile.data).toMatchObject({ spaces: [{ name: 'NorthList', postsPerDay: 3, channels: [], links: [] }] });
+    expect(JSON.stringify(profile.data)).not.toMatch(/repliesPerDay|shippedFrom/);
     expect(JSON.stringify(profile.data)).not.toMatch(/accessToken|Enc/);
   });
 });

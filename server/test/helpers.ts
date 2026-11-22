@@ -9,12 +9,18 @@ export function app() {
   return createApp('/nonexistent-web-dir');
 }
 
-/** A signed-in agent (cookie kept between requests). */
-export async function signedIn() {
+/** A signed-in agent (cookie kept between requests) with one space, like after the first-run goal step. */
+export async function signedIn(options: { space?: boolean } = {}) {
   const agent = request.agent(app());
   await agent.post('/api/auth/dev-login').send({ email: OWNER }).expect(200);
   const user = await prisma.user.findUniqueOrThrow({ where: { email: OWNER } });
-  return { agent, user };
+  const space =
+    options.space === false
+      ? null
+      : ((await agent.post('/api/spaces').send({ goal: 'PROMOTE', name: 'NorthList' }).expect(200)).body as {
+          id: string;
+        });
+  return { agent, user, space: space! };
 }
 
 export async function aiToken(userId: string, name = 'Claude Code') {
@@ -44,4 +50,18 @@ export function toolResult(res: request.Response) {
 function parseSse(text: string) {
   const line = text.split('\n').find((l) => l.startsWith('data:'));
   return line ? JSON.parse(line.slice(5)) : {};
+}
+
+/** Connect through the fake OAuth flow to a space, like a click on Connect. */
+export async function connect(
+  agent: Awaited<ReturnType<typeof signedIn>>['agent'],
+  channel: 'x' | 'linkedin',
+  space: string,
+  expected = 'connected=1',
+) {
+  const start = await agent.get(`/api/connect/${channel}/start?space=${space}`).expect(302);
+  const callback = new URL(start.headers.location);
+  const done = await agent.get(callback.pathname + callback.search).expect(302);
+  if (done.headers.location !== `/space?channel=${channel}&${expected}`)
+    throw new Error(`Connect ended at ${done.headers.location}`);
 }

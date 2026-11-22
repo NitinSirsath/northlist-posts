@@ -12,7 +12,10 @@ export const TITLE_MAX = 160;
 export const WHY_MAX = 300;
 export const IDEAS_PER_CALL = 15;
 export const INTERESTS_MAX = 8;
-export const SHIPPED_FROM_MAX = 8;
+export const LINKS_MAX = 12;
+export const SPACES_MAX = 5;
+/** The first-run steps: welcome, goal, links, interests, voice, accounts, rhythm, your AI, done. */
+export const ONBOARDING_STEPS = 9;
 export const STYLE_SAMPLES_MAX = 3;
 export const STYLE_SAMPLE_LENGTH = 3000;
 export const UNDO_SECONDS = 10;
@@ -50,30 +53,83 @@ const shortText = (max: number) => z.string().trim().max(max);
 export const GoalSchema = z.enum(['PROMOTE', 'NETWORK', 'JOB']);
 export type Goal = z.infer<typeof GoalSchema>;
 
-export const ProfileFieldsSchema = z.object({
+export const ToneSchema = z.enum(['PLAIN', 'FRIENDLY', 'BOLD']);
+export type Tone = z.infer<typeof ToneSchema>;
+
+/** "HH:MM", 24-hour. */
+export const TimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM, for example 08:00');
+
+export const SpaceFieldsSchema = z.object({
+  name: shortText(40).min(1),
   goal: GoalSchema,
   productName: shortText(80),
   productUrl: z.union([z.literal(''), httpUrl]),
   productLine: shortText(200),
   interests: z.array(shortText(60).min(1)).max(INTERESTS_MAX),
-  shippedFrom: z.array(shortText(80).min(1)).max(SHIPPED_FROM_MAX),
   postsPerDay: z.number().int().min(0).max(10),
   repliesPerDay: z.number().int().min(0).max(10),
   useX: z.boolean(),
   useLinkedIn: z.boolean(),
+  tone: ToneSchema,
   styleSamples: z.array(shortText(STYLE_SAMPLE_LENGTH).min(1)).max(STYLE_SAMPLES_MAX),
+  readyAt: TimeSchema,
+  weekends: z.boolean(),
 });
-export type ProfileFields = z.infer<typeof ProfileFieldsSchema>;
+export type SpaceFields = z.infer<typeof SpaceFieldsSchema>;
 
 /** Any subset of the fields; unknown keys are refused. */
-export const ProfilePatchSchema = ProfileFieldsSchema.partial().strict();
-export type ProfilePatch = z.infer<typeof ProfilePatchSchema>;
+export const SpacePatchSchema = SpaceFieldsSchema.partial().strict();
+export type SpacePatch = z.infer<typeof SpacePatchSchema>;
 
-export interface ProfileView extends ProfileFields {
+/** A new space needs only its goal; the name can come later (from the first link). */
+export const CreateSpaceSchema = SpaceFieldsSchema.partial().extend({ goal: GoalSchema }).strict();
+
+export type LinkKind = 'WEBSITE' | 'GITHUB_REPO' | 'GITHUB_PROFILE' | 'PAGE';
+
+export interface SourceLinkView {
+  id: string;
+  url: string;
+  kind: LinkKind;
+  title: string;
+  description: string;
+  /** A private GitHub repo: the user's own AI reads it with its own GitHub access. */
+  isPrivate: boolean;
+  /** False when the page could not be read when it was added. */
+  readOk: boolean;
+}
+
+/** A pasted link; "northlist.site/changelog" without https:// is fine. */
+export const AddLinkSchema = z.object({ url: z.string().trim().min(3).max(2048) }).strict();
+
+/** Adds https:// when the scheme is missing; null when it is not a web link. */
+export function normalizeLink(input: string): string | null {
+  const raw = input.trim();
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    const url = new URL(withScheme);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    if (!url.hostname.includes('.')) return null;
+    url.hash = '';
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return null;
+  }
+}
+
+export interface SpaceView extends SpaceFields {
+  id: string;
+  links: SourceLinkView[];
+  connections: ConnectionView[];
+  /** Drafts waiting on Today in this space. */
+  newDrafts: number;
   /** "you", or the name of the AI that saved it last. */
   updatedBy: string;
   updatedAt: string;
 }
+
+export const OnboardingPatchSchema = z
+  .object({ step: z.number().int().min(0).max(ONBOARDING_STEPS), done: z.boolean().optional() })
+  .strict();
 
 export const IdeaKindSchema = z.enum(['SHIPPED', 'NEWS', 'OWN', 'REPLY']);
 export type IdeaKind = z.infer<typeof IdeaKindSchema>;
@@ -115,7 +171,12 @@ export const SubmitIdeaSchema = z
   });
 export type SubmitIdea = z.infer<typeof SubmitIdeaSchema>;
 
-export const SubmitDraftsSchema = z.object({ ideas: z.array(SubmitIdeaSchema).min(1).max(IDEAS_PER_CALL) }).strict();
+export const SubmitDraftsSchema = z
+  .object({
+    space: z.string().trim().min(1).max(40).optional(),
+    ideas: z.array(SubmitIdeaSchema).min(1).max(IDEAS_PER_CALL),
+  })
+  .strict();
 
 export type PostStatus = 'WAITING' | 'SENDING' | 'POSTED' | 'FAILED' | 'CANCELLED';
 
@@ -135,6 +196,7 @@ export interface PostView {
 
 export interface IdeaView {
   id: string;
+  spaceId: string;
   kind: IdeaKind;
   title: string;
   why: string;
@@ -164,6 +226,7 @@ export const PostRequestSchema = z.object({ channel: z.enum(['X', 'LINKEDIN']) }
 
 export interface ConnectionView {
   channel: Channel;
+  spaceId: string;
   accountName: string;
   /** Days until the sign-in runs out, when known. */
   expiresInDays: number | null;
@@ -192,6 +255,9 @@ export interface MeView {
   vapidPublicKey: string | null;
   /** Local testing only: fake X and LinkedIn. */
   fakeSocial: boolean;
+  /** First-run steps: the step reached, and whether they are finished (or skipped). */
+  onboardingStep: number;
+  onboarded: boolean;
 }
 
 export interface PostedSummary {

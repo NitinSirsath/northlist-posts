@@ -1,6 +1,6 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { idea, me, mockApi, post, profile, renderApp } from './utils';
+import { idea, me, mockApi, post, renderApp, space } from './utils';
 
 describe('Phone layout', () => {
   const original = window.matchMedia;
@@ -24,8 +24,8 @@ describe('Phone layout', () => {
     const posted = post({ channel: 'X', status: 'POSTED', postedAt: new Date().toISOString() });
     mockApi({
       'GET /api/me': me,
-      'GET /api/profile': profile,
-      'GET /api/ideas/today': [
+      'GET /api/spaces': [space],
+      'GET /api/ideas/today?space=sp1': [
         idea({ id: 'a1', kind: 'NEWS', title: 'Survey news', linkedinText: 'LinkedIn text', posts: [posted] }),
         idea({ id: 'a2', kind: 'SHIPPED', title: 'Shipped thing', xText: 'X text', linkedinText: 'LinkedIn text' }),
       ],

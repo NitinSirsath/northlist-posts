@@ -9,6 +9,8 @@ const MINUTE_MS = 60_000;
 export const SIGN_IN_PER_MINUTE = 20;
 export const API_PER_MINUTE = 600;
 export const LINK_PER_MINUTE = 120;
+/** Pasted links we fetch to read their title (each one is a request to another site). */
+export const LINK_READS_PER_MINUTE = 20;
 export const MCP_ADDRESS_PER_MINUTE = 120;
 export const MCP_TOKEN_PER_MINUTE = 60;
 

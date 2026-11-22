@@ -1,22 +1,16 @@
-/** Connect: get the kit, connect your AI with a token, connect X and LinkedIn, and alerts. */
+/** Connect: get the kit, connect your AI with a token, and alerts. X and LinkedIn are per space (Space page). */
 import { useNavigate } from '@tanstack/react-router';
 import clsx from 'clsx';
 import { Bell, Check, Copy, ExternalLink, X as XIcon } from 'lucide-react';
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import {
-  RECONNECT_WARNING_DAYS,
-  type Channel,
-  type ConnectionView,
-  type IntegrationTokenView,
-  type MeView,
-} from '../../shared/contracts';
+import type { IntegrationTokenView, MeView } from '../../shared/contracts';
 import { errorMessage } from '../api';
 import { ErrorText, Page, SectionHeading } from '../components/ui';
 import { alertsSupported, currentSubscription, turnAlertsOff, turnAlertsOn } from '../lib/alerts';
 import { copyText, useCopy } from '../lib/clipboard';
 import { channelName, shortDate, when } from '../lib/format';
 import { useFlash } from '../lib/hooks';
-import { useConnections, useCreateToken, useDisconnect, useMe, useRevokeToken, useTokens } from '../queries';
+import { useCreateToken, useMe, useRevokeToken, useTokens } from '../queries';
 
 export interface ConnectSearch {
   channel?: string;
@@ -25,14 +19,25 @@ export interface ConnectSearch {
   error?: string;
 }
 
-export function setupPrompt({ mcpUrl, kitUrl, token }: { mcpUrl: string; kitUrl: string; token: string }) {
+export function setupPrompt({
+  mcpUrl,
+  kitUrl,
+  token,
+  readyAt,
+}: {
+  mcpUrl: string;
+  kitUrl: string;
+  token: string;
+  readyAt?: string;
+}) {
   return [
-    'Connect NorthList Posts to this AI app, then set up my profile.',
+    'Connect NorthList Posts to this AI app. My spaces are already set up in the app.',
     `Server: ${mcpUrl}`,
     `Token: ${token}`,
     `1. Work in the NorthList Posts kit folder. If you are not in it, get it first: ${kitUrl}`,
     '2. Follow instructions/connect.md in the kit to add the server with this token. Never write the token into the kit folder or any file in it.',
-    '3. Then follow instructions/setup.md and ask me the setup questions.',
+    '3. Then call get_profile and tell me which spaces you see.',
+    `4. If you can run scheduled tasks, run "daily" every morning${readyAt ? ` before ${readyAt} my time` : ''}.`,
   ].join('\n');
 }
 
@@ -57,7 +62,10 @@ export function ConnectPage({ search }: { search: ConnectSearch }) {
         <>
           <ol className="panel rows flex flex-col" aria-label="Steps">
             <Step n={1} done={hasToken} title="Get the kit" right={<KitLink url={me.data.kitUrl} />}>
-              <p>A folder of instruction files. Open it in your AI app (Claude Code, Codex or Antigravity).</p>
+              <p>
+                A folder of instruction files. Open it in your AI app (Antigravity recommended; Claude Code and Codex
+                work too).
+              </p>
             </Step>
             <ConnectAiStep me={me.data} tokens={tokens.data ?? []} done={hasToken} tokensError={tokens.error} />
             <Step n={3} title="Each morning">
@@ -67,7 +75,6 @@ export function ConnectPage({ search }: { search: ConnectSearch }) {
               </p>
             </Step>
           </ol>
-          <WherePostsGo fake={me.data.fakeSocial} />
           <Alerts vapidPublicKey={me.data.vapidPublicKey} />
         </>
       )}
@@ -156,14 +163,14 @@ function ConnectAiStep({
   tokensError: unknown;
 }) {
   const nameId = useId();
-  const [name, setName] = useState('Claude Code');
+  const [name, setName] = useState('Antigravity');
   const create = useCreateToken();
   const [created, setCreated] = useState<{ prompt: string; token: string } | null>(null);
   const [copyNote, setCopyNote] = useState<string | null>(null);
 
   function onCreate() {
     setCopyNote(null);
-    create.mutate(name.trim() || 'Claude Code', {
+    create.mutate(name.trim() || 'Antigravity', {
       onSuccess: async ({ plaintext }) => {
         const prompt = setupPrompt({ mcpUrl: me.mcpUrl, kitUrl: me.kitUrl, token: plaintext });
         setCreated({ prompt, token: plaintext });
@@ -180,8 +187,7 @@ function ConnectAiStep({
   return (
     <Step n={2} done={done} title="Connect your AI">
       <p>
-        Copy the setup prompt and paste it into your AI. It connects itself, then asks you a few questions for your
-        profile.
+        Copy the setup prompt and paste it into your AI. It connects itself and reads your spaces; nothing to answer.
       </p>
       <div className="mt-3 flex flex-wrap items-end gap-2">
         <label htmlFor={nameId} className="sr-only">
@@ -286,91 +292,6 @@ function TokenList({ tokens }: { tokens: IntegrationTokenView[] }) {
       </ul>
       <ErrorText error={revoke.error} className="mt-2" />
     </>
-  );
-}
-
-const CHANNELS: Channel[] = ['X', 'LINKEDIN'];
-const startUrl = (channel: Channel) => `/api/connect/${channel === 'X' ? 'x' : 'linkedin'}/start`;
-
-function WherePostsGo({ fake }: { fake: boolean }) {
-  const connections = useConnections();
-  const disconnect = useDisconnect();
-  return (
-    <section aria-label="Where posts go" className="flex flex-col gap-4">
-      <SectionHeading title="Where posts go" note={fake ? 'Test mode: X and LinkedIn are fake' : undefined} />
-      <div className="panel rows">
-        {CHANNELS.map((channel) => (
-          <ChannelRow
-            key={channel}
-            channel={channel}
-            connection={connections.data?.find((c) => c.channel === channel)}
-            loading={connections.isPending}
-            onDisconnect={() => disconnect.mutate(channel)}
-            disconnecting={disconnect.isPending && disconnect.variables === channel}
-          />
-        ))}
-      </div>
-      <ErrorText error={connections.error ?? disconnect.error} />
-    </section>
-  );
-}
-
-function ChannelRow({
-  channel,
-  connection,
-  loading,
-  onDisconnect,
-  disconnecting,
-}: {
-  channel: Channel;
-  connection?: ConnectionView;
-  loading: boolean;
-  onDisconnect: () => void;
-  disconnecting: boolean;
-}) {
-  const name = channelName(channel);
-  const days = connection?.expiresInDays;
-  const expiring = channel === 'LINKEDIN' && days !== null && days !== undefined && days <= RECONNECT_WARNING_DAYS;
-  return (
-    <div className="flex min-h-[54px] items-center justify-between gap-3 px-4 py-3 text-sm md:px-6">
-      <span className="flex flex-wrap items-center gap-2">
-        {connection && !expiring && <span aria-hidden className="inline-block size-[7px] rounded-full bg-ok" />}
-        <span>
-          {name} · {loading ? '…' : connection ? connection.accountName : 'Not connected'}
-        </span>
-        {expiring && (
-          <span className="tag tag-yellow">
-            {days === 0 ? 'Reconnect today' : `Reconnect in ${days} day${days === 1 ? '' : 's'}`}
-          </span>
-        )}
-      </span>
-      <span className="flex items-center gap-1">
-        {connection ? (
-          <>
-            {expiring && (
-              <a href={startUrl(channel)} className="btn btn-ghost btn-sm">
-                Reconnect
-              </a>
-            )}
-            <button
-              type="button"
-              className="btn btn-plain btn-sm"
-              onClick={onDisconnect}
-              disabled={disconnecting}
-              aria-label={`Disconnect ${name}`}
-            >
-              Disconnect
-            </button>
-          </>
-        ) : (
-          !loading && (
-            <a href={startUrl(channel)} className="btn btn-secondary btn-sm">
-              Connect {name}
-            </a>
-          )
-        )}
-      </span>
-    </div>
   );
 }
 

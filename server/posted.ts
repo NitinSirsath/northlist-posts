@@ -5,15 +5,15 @@ import { toPostView } from './ideas.js';
 
 const WEEK_MS = 7 * 86_400_000;
 
-export async function postedSummary(userId: string, now = new Date()): Promise<PostedSummary> {
+export async function postedSummary(userId: string, spaceId: string, now = new Date()): Promise<PostedSummary> {
   const since = new Date(now.getTime() - WEEK_MS);
   const [posts, replies] = await Promise.all([
     prisma.post.findMany({
-      where: { userId, status: { in: ['POSTED', 'FAILED'] }, createdAt: { gte: since } },
+      where: { userId, status: { in: ['POSTED', 'FAILED'] }, createdAt: { gte: since }, idea: { spaceId } },
       include: { idea: { include: { shortLinks: true } } },
       orderBy: { createdAt: 'desc' },
     }),
-    prisma.idea.count({ where: { userId, kind: 'REPLY', copiedAt: { gte: since } } }),
+    prisma.idea.count({ where: { userId, spaceId, kind: 'REPLY', copiedAt: { gte: since } } }),
   ]);
   const views = posts.map((post) => toPostView(post, post.idea.shortLinks));
   const posted = views.filter((p) => p.status === 'POSTED');

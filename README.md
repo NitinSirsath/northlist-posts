@@ -2,14 +2,14 @@
 
 Your AI writes the posts. You pick, edit and post them to X and LinkedIn.
 
-The user's own AI app (Claude Code, Codex, Antigravity) runs the [NorthList Posts kit](https://github.com/NitinSirsath/northlist-posts-kit). It reads the user's profile from this app over MCP, finds what they shipped and fresh news, writes the day's drafts and sends them here. This app shows them on **Today**; the user edits, adds one line of their own view, and taps **Post**. Each post waits 10 seconds with **Undo**, then goes out. Reply drafts are copied and posted by the user on X.
+The user's own AI app (Antigravity recommended; Claude Code, Codex) runs the [NorthList Posts kit](https://github.com/NitinSirsath/northlist-posts-kit). It reads the user's spaces from this app over MCP (each space: one goal with its own links, interests, voice and X/LinkedIn accounts), finds what they shipped from the space's GitHub and changelog links and fresh news, writes the day's drafts and sends them here. This app shows them on **Today**; the user edits, adds one line of their own view, and taps **Post**. Each post waits 10 seconds with **Undo**, then goes out. Reply drafts are copied and posted by the user on X.
 
 Private for now: only the emails in `OWNER_EMAIL` can sign in.
 
 ## Parts
 
-- `server/`: Express 5 + Prisma (PostgreSQL). Google sign-in, profile, drafts, posting worker, short links, web push, and the MCP endpoint `/mcp` (tools `get_profile`, `get_recent_posts`, `save_profile`, `submit_drafts`).
-- `web/`: React + Vite + Tailwind. Pages Today, Posted, Profile, Connect; phone layout under 768 px.
+- `server/`: Express 5 + Prisma (PostgreSQL). Google sign-in, first-run steps, spaces and their links (a careful link reader), drafts, posting worker (each draft posts only from its own space's account), short links, web push, and the MCP endpoint `/mcp` (tools `get_profile`, `get_recent_posts`, `save_profile`, `submit_drafts`).
+- `web/`: React + Vite + Tailwind. First-run steps (/welcome, also "New space"), a space switcher, pages Today, Posted, Space, Connect; phone layout under 768 px.
 - `shared/contracts.ts`: shapes and limits used by both, and by the MCP tools.
 - `prisma/`: schema and migrations.
 

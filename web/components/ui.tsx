@@ -11,7 +11,7 @@ export function Page({
   phoneBar,
   children,
 }: {
-  title: string;
+  title: ReactNode;
   subtitle?: ReactNode;
   aside?: ReactNode;
   /** Phone only: the glass buttons above the title (back, avatar). */

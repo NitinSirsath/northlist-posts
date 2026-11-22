@@ -1,9 +1,10 @@
 /**
  * The MCP tools the user's AI calls. The user always comes from the verified token, never from input.
- *   get_profile       what to write about and how (read)
- *   get_recent_posts  what went out lately and what is still waiting (read)
- *   save_profile      fills the profile during setup (write)
- *   submit_drafts     sends the day's post ideas to Today (write)
+ *   get_profile       every space: what to write about and how (read)
+ *   get_recent_posts  one space: what went out lately and what is still waiting (read)
+ *   save_profile      changes one space when the user asks in chat (write)
+ *   submit_drafts     sends one space's post ideas to Today (write)
+ * A user with one space may leave out "space"; with more, every space tool needs it.
  * Input is validated in the handler with the shared zod schemas; the SDK gets a plain JSON Schema
  * (no unions, look-aheads or $schema) because some AI apps accept only a subset.
  */
@@ -13,7 +14,6 @@ import {
   IDEAS_PER_CALL,
   INTERESTS_MAX,
   LINKEDIN_MAX,
-  SHIPPED_FROM_MAX,
   STYLE_SAMPLES_MAX,
   STYLE_SAMPLE_LENGTH,
   TITLE_MAX,
@@ -21,9 +21,9 @@ import {
   X_MAX,
 } from '../../shared/contracts.js';
 import { prisma } from '../db.js';
-import { fieldsOf } from '../errors.js';
+import { AppError, fieldsOf } from '../errors.js';
 import { recentForAi, submitDrafts } from '../ideas.js';
-import { getProfile, saveProfile } from '../profile.js';
+import { findSpace, listSpaces, resolveSpace, spaceForAi, updateSpace } from '../spaces.js';
 import { alertUser } from '../push.js';
 import { currentCall } from './callLog.js';
 
@@ -40,7 +40,14 @@ const strList = (maxItems: number, maxLength: number, description: string) => ({
   description,
 });
 
+const SPACE_ID = {
+  type: 'string',
+  maxLength: 40,
+  description: 'The space id from get_profile. Needed when there is more than one space.',
+};
+
 const PROFILE_PROPERTIES = {
+  space: SPACE_ID,
   goal: {
     type: 'string',
     enum: ['PROMOTE', 'NETWORK', 'JOB'],
@@ -50,8 +57,8 @@ const PROFILE_PROPERTIES = {
   productUrl: { type: 'string', maxLength: 2048, description: 'http(s) link to the product, or an empty string' },
   productLine: str(200, 'One line on what the product does'),
   interests: strList(INTERESTS_MAX, 60, 'Topics to find news about'),
-  shippedFrom: strList(SHIPPED_FROM_MAX, 80, 'Project folders or repo names to read for "what I shipped" posts'),
   postsPerDay: { type: 'integer', minimum: 0, maximum: 10 },
+  tone: { type: 'string', enum: ['PLAIN', 'FRIENDLY', 'BOLD'] },
   useX: { type: 'boolean' },
   useLinkedIn: { type: 'boolean' },
   styleSamples: strList(
@@ -66,6 +73,7 @@ export const SAVE_PROFILE_INPUT = { type: 'object', properties: PROFILE_PROPERTI
 export const SUBMIT_DRAFTS_INPUT = {
   type: 'object',
   properties: {
+    space: SPACE_ID,
     ideas: {
       type: 'array',
       minItems: 1,
@@ -100,6 +108,12 @@ export const SUBMIT_DRAFTS_INPUT = {
 };
 
 const EMPTY_INPUT = { type: 'object', properties: {}, additionalProperties: false };
+const SPACE_INPUT = { type: 'object', properties: { space: SPACE_ID }, additionalProperties: false };
+
+const spaceArg = (args: unknown) => {
+  const value = (args as { space?: unknown } | undefined)?.space;
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+};
 
 const advertised = (schema: Record<string, unknown>): StandardSchemaWithJSON<unknown, unknown> => ({
   '~standard': {
@@ -149,6 +163,12 @@ async function run(
       };
       return { content: [{ type: 'text' as const, text: JSON.stringify(body) }], isError: true };
     }
+    // A known problem the AI can fix (no such space, which space?): say so in plain words.
+    if (err instanceof AppError && err.status < 500) {
+      if (call) Object.assign(call, { outcome: 'invalid_input', errorCategory: err.code });
+      const body = { code: err.code.toLowerCase(), message: err.message, retry: 'Fix this, then call again.' };
+      return { content: [{ type: 'text' as const, text: JSON.stringify(body) }], isError: true };
+    }
     if (call)
       Object.assign(call, { outcome: 'unavailable', errorCategory: err instanceof Error ? err.name : 'UnknownError' });
     return toolError('unavailable');
@@ -166,16 +186,15 @@ export function createMcpServer(authInfo: AuthInfo | undefined) {
     {
       title: 'Get profile',
       description:
-        "The user's goal, product, interests, projects for shipped posts, posts per day, channels and style samples. Read it before writing.",
+        "The user's spaces. Each space is one goal with its own product, links to read (websites, GitHub repos; private repos you read with your own GitHub access), interests, posts per day, tone, style samples and connected channels. Write for each space separately. Read it before writing.",
       inputSchema: advertised(EMPTY_INPUT),
       annotations: READ,
     },
     () =>
       run('get_profile', authInfo, async (userId) => {
-        // Reply drafts are not part of this version, so the AI never sees a replies number.
-        const { repliesPerDay: _replies, ...profile } = await getProfile(userId);
-        const connected = await prisma.socialConnection.findMany({ where: { userId }, select: { channel: true } });
-        return { profile, connectedChannels: connected.map((c) => c.channel), now: new Date().toISOString() };
+        const ids = (await listSpaces(userId)).map((s) => s.id);
+        const spaces = await Promise.all(ids.map(async (id) => spaceForAi(await findSpace(userId, id))));
+        return { spaces, now: new Date().toISOString() };
       }),
   );
 
@@ -184,11 +203,15 @@ export function createMcpServer(authInfo: AuthInfo | undefined) {
     {
       title: 'Get recent posts',
       description:
-        'The last 30 posts that went out, ideas still waiting on Today, and how many ideas of each kind were sent in the last 20 hours. Read it so you do not repeat a topic or send more than the daily numbers.',
-      inputSchema: advertised(EMPTY_INPUT),
+        'For one space: the last 30 posts that went out, ideas still waiting on Today, and how many ideas of each kind were sent in the last 20 hours. Read it so you do not repeat a topic or send more than the daily numbers.',
+      inputSchema: advertised(SPACE_INPUT),
       annotations: READ,
     },
-    () => run('get_recent_posts', authInfo, (userId) => recentForAi(userId)),
+    (args: unknown) =>
+      run('get_recent_posts', authInfo, async (userId) => {
+        const space = await resolveSpace(userId, spaceArg(args));
+        return { space: space.name, ...(await recentForAi(userId, space.id)) };
+      }),
   );
 
   server.registerTool(
@@ -196,12 +219,17 @@ export function createMcpServer(authInfo: AuthInfo | undefined) {
     {
       title: 'Save profile',
       description:
-        'Save the fields the user told you during setup. Send only the fields that change. The user can see and change them in the app.',
+        'Change one space when the user asks you to (setup itself happens in the app). Send only the fields that change. The user sees the change in the app.',
       inputSchema: advertised(SAVE_PROFILE_INPUT),
       annotations: WRITE,
     },
     (args: unknown) =>
-      run('save_profile', authInfo, async (userId, aiName) => ({ profile: await saveProfile(userId, args, aiName) })),
+      run('save_profile', authInfo, async (userId, aiName) => {
+        const { space: _space, ...fields } = (args ?? {}) as Record<string, unknown>;
+        const space = await resolveSpace(userId, spaceArg(args));
+        const saved = await updateSpace(userId, space.id, fields, aiName);
+        return { space: spaceForAi(await findSpace(userId, saved.id)) };
+      }),
   );
 
   server.registerTool(
@@ -209,7 +237,7 @@ export function createMcpServer(authInfo: AuthInfo | undefined) {
     {
       title: 'Submit drafts',
       description: [
-        "Send post ideas to the user's Today page. Nothing is posted: the user reads, edits and posts each one.",
+        "Send one space's post ideas to the user's Today page (say which space). Nothing is posted: the user reads, edits and posts each one.",
         'Each idea has a kind (SHIPPED, NEWS, OWN), a short title, one line why, and an X text and/or a LinkedIn text.',
         'NEWS needs sourceUrl.',
         `At most ${IDEAS_PER_CALL} ideas per call. The same idea sent again is kept once (already_sent).`,

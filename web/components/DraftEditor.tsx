@@ -11,7 +11,7 @@ import { channelName, hostOf, kindLabel, timeAgo } from '../lib/format';
 import { useFlash } from '../lib/hooks';
 import { channelsOf, latestPost } from '../lib/today';
 import { useIdeaEdits } from '../lib/useIdeaEdits';
-import { useProfile, useSkipIdea } from '../queries';
+import { useSkipIdea, useSpaces } from '../queries';
 import { ChannelLogo } from './brand';
 import { ChannelAction, Counter, DraftBox, TakeField, UndoBar } from './drafts';
 import { ErrorText } from './ui';
@@ -117,7 +117,9 @@ export function DraftEditor({ idea, phone, onSkipped }: { idea: IdeaView; phone?
   // Every channel's Undo shows, so switching never hides a countdown.
   const waiting = channels.map((c) => latestPost(idea, c)).filter((p) => p?.status === 'WAITING');
   const Icon = KIND_ICON[idea.kind];
-  const productName = useProfile().data?.productName.trim();
+  const productName = useSpaces()
+    .data?.find((s) => s.id === idea.spaceId)
+    ?.productName.trim();
 
   const actions = (
     <>

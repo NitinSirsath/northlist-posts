@@ -3,7 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, createMemoryHistory } from '@tanstack/react-router';
 import { render } from '@testing-library/react';
 import { vi } from 'vitest';
-import type { IdeaView, MeView, PostView, ProfileView } from '../../shared/contracts';
+import type { IdeaView, MeView, PostView, SpaceView } from '../../shared/contracts';
 import { createQueryClient } from '../queries';
 import { createAppRouter } from '../router';
 
@@ -63,29 +63,42 @@ export const me: MeView = {
   kitUrl: 'https://github.com/example/kit',
   vapidPublicKey: null,
   fakeSocial: false,
+  onboardingStep: 9,
+  onboarded: true,
 };
 
-export const profile: ProfileView = {
+export const space: SpaceView = {
+  id: 'sp1',
+  name: 'NorthList',
   goal: 'PROMOTE',
   productName: 'NorthList',
   productUrl: 'https://northlist.site',
   productLine: 'Job mails only.',
   interests: ['React'],
-  shippedFrom: ['NorthList app'],
   postsPerDay: 3,
-  repliesPerDay: 5,
+  repliesPerDay: 0,
   useX: true,
   useLinkedIn: true,
+  tone: 'PLAIN',
   styleSamples: [],
+  readyAt: '08:00',
+  weekends: false,
+  links: [],
+  connections: [],
+  newDrafts: 0,
   updatedBy: 'you',
   updatedAt: '2026-11-19T08:00:00.000Z',
 };
+
+/** The routes every signed-in page reads: who you are and your spaces. */
+export const base = { 'GET /api/me': me, 'GET /api/spaces': [space] };
 
 let n = 0;
 export function idea(over: Partial<IdeaView> = {}): IdeaView {
   n += 1;
   return {
     id: `idea${n}`,
+    spaceId: 'sp1',
     kind: 'SHIPPED',
     title: `Idea ${n}`,
     why: '',
