@@ -18,7 +18,8 @@ export function fakeProvider(channel: Channel, publicUrl: string): SocialProvide
     async exchange() {
       return {
         accessToken: `fake-${channel}`,
-        accountId: `fake-${channel.toLowerCase()}`,
+        // A new account each time, so two spaces can each have their own test account.
+        accountId: `fake-${channel.toLowerCase()}-${crypto.randomBytes(4).toString('hex')}`,
         accountName: channel === 'X' ? '@you_test' : 'You (test)',
         expiresAt: channel === 'LINKEDIN' ? new Date(Date.now() + 12 * 86_400_000) : undefined,
       };
