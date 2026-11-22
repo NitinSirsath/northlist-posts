@@ -1,0 +1,38 @@
+name: Delete once (temporary)
+# Deletes the reviewed file(s) from feat/spaces-onboarding and nothing else.
+# Lives only on the throwaway branch tmp/delete-once, which is deleted afterwards.
+on:
+  push:
+    branches: [tmp/delete-once]
+permissions:
+  contents: write
+concurrency:
+  group: delete-once
+  cancel-in-progress: false
+jobs:
+  finish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: feat/spaces-onboarding
+      - name: Check the branch
+        run: |
+          if [ "$(git rev-parse 'HEAD^{tree}')" != "e9f25998b3b51f7ebf034b29783750b35eaf7ba5" ]; then
+            echo "feat/spaces-onboarding does not hold exactly the reviewed files. Nothing was changed."
+            exit 1
+          fi
+      - name: Delete and check
+        run: |
+          git rm -q 'server/profile.ts'
+          if [ "$(git write-tree)" != "040751df25166013e992882e1715eaeb4a1b094a" ]; then
+            echo "The result does not match the reviewed files. Nothing was pushed."
+            exit 1
+          fi
+      - name: Commit only the reviewed result
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: delete server/profile.ts'
+          git push origin HEAD:feat/spaces-onboarding
