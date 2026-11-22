@@ -11,7 +11,8 @@ const TABLES = [
   'PushSubscription',
   'Session',
   'OAuthState',
-  'Profile',
+  'SourceLink',
+  'Space',
   'User',
 ];
 
