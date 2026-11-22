@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { me, mockApi, renderApp, signedOut } from './utils';
+import { me, mockApi, renderApp, signedOut, space } from './utils';
 
 describe('Sign in', () => {
   it('shows "This app is private." for ?error=private', async () => {
@@ -18,7 +18,7 @@ describe('Sign in', () => {
   });
 
   it('shows the app when signed in', async () => {
-    mockApi({ 'GET /api/me': me, 'GET /api/ideas/today': [], 'GET /api/profile': {} });
+    mockApi({ 'GET /api/me': me, 'GET /api/ideas/today?space=sp1': [], 'GET /api/spaces': [space] });
     renderApp('/sign-in');
     expect(await screen.findByRole('heading', { name: 'Today' })).toBeInTheDocument();
   });
