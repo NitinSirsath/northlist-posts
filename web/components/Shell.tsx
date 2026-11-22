@@ -1,19 +1,20 @@
 /** The signed-in frame: side menu on the laptop, glass tab bar on the phone. */
 import { Link, Outlet, useRouterState } from '@tanstack/react-router';
 import clsx from 'clsx';
-import { LogOut, Plug, Send, Sun, User, type LucideIcon } from 'lucide-react';
+import { LayoutGrid, LogOut, Plug, Send, Sun, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { MeView } from '../../shared/contracts';
 import { useIsPhone } from '../lib/hooks';
-import { useSignOut, useToday } from '../queries';
-import { Avatar, ErrorText, Logo } from './ui';
+import { useCurrentSpace, useSignOut } from '../queries';
+import { SideSwitcher } from './SpaceSwitcher';
+import { Avatar, ErrorText } from './ui';
 
-type Path = '/' | '/posted' | '/profile' | '/connect';
+type Path = '/' | '/posted' | '/space' | '/connect';
 const NAV: { to: Path; label: string; icon: LucideIcon }[] = [
   { to: '/', label: 'Today', icon: Sun },
   { to: '/posted', label: 'Posted', icon: Send },
-  { to: '/profile', label: 'Profile', icon: User },
-  { to: '/connect', label: 'Connect', icon: Plug },
+  { to: '/space', label: 'Space', icon: LayoutGrid },
+  { to: '/connect', label: 'Connect', icon: Plug }
 ];
 
 const titleOf = (path: string) =>
@@ -47,14 +48,11 @@ export function Shell({ me }: { me: MeView }) {
 }
 
 function SideMenu({ me }: { me: MeView }) {
-  const today = useToday();
-  const count = today.data?.length;
+  const count = useCurrentSpace().space?.newDrafts;
   return (
     <aside className="flex w-[232px] shrink-0 flex-col border-r border-border-subtle">
-      <div className="flex h-14 items-center px-5">
-        <Logo />
-      </div>
-      <nav aria-label="Main" className="flex flex-col gap-0.5 px-2 py-4">
+      <SideSwitcher />
+      <nav aria-label="Main" className="flex flex-col gap-0.5 px-2 py-3">
         {NAV.map(({ to, label, icon: Icon }) => (
           <Link
             key={to}
