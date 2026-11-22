@@ -14,8 +14,11 @@ model User {
   email             String             @unique
   name              String
   createdAt         DateTime           @default(now())
+  /// The first-run steps (owner, 22 Nov 2026): the step reached, and when they were finished or skipped.
+  onboardingStep    Int                @default(0)
+  onboardedAt       DateTime?
   sessions          Session[]
-  profile           Profile?
+  spaces            Space[]
   ideas             Idea[]
   posts             Post[]
   connections       SocialConnection[]
@@ -42,24 +45,69 @@ enum Goal {
   JOB
 }
 
-/// What the AI reads before it writes (get_profile) and may fill during setup (save_profile).
-model Profile {
-  userId        String   @id
-  goal          Goal     @default(PROMOTE)
-  productName   String   @default("")
-  productUrl    String   @default("")
-  productLine   String   @default("")
-  interests     String[] @default([])
-  shippedFrom   String[] @default([])
-  postsPerDay   Int      @default(3)
-  repliesPerDay Int      @default(0)
-  useX          Boolean  @default(true)
-  useLinkedIn   Boolean  @default(true)
-  styleSamples  String[] @default([])
+enum Tone {
+  PLAIN
+  FRIENDLY
+  BOLD
+}
+
+/// A space (owner, 22 Nov 2026): one goal with its own links, interests, voice, rhythm and its own X and
+/// LinkedIn accounts, e.g. "NorthList" and "Personal". The AI reads every space (get_profile) and sends
+/// each draft to one space.
+model Space {
+  id            String             @id @default(cuid())
+  userId        String
+  name          String
+  goal          Goal               @default(PROMOTE)
+  productName   String             @default("")
+  productUrl    String             @default("")
+  productLine   String             @default("")
+  interests     String[]           @default([])
+  postsPerDay   Int                @default(3)
+  repliesPerDay Int                @default(0)
+  useX          Boolean            @default(true)
+  useLinkedIn   Boolean            @default(true)
+  tone          Tone               @default(PLAIN)
+  styleSamples  String[]           @default([])
+  /// When the drafts should be waiting, "HH:MM" in the user's own time.
+  readyAt       String             @default("08:00")
+  weekends      Boolean            @default(false)
+  position      Int                @default(0)
   /// "you" or the name of the AI token that last saved it.
-  updatedBy     String   @default("you")
-  updatedAt     DateTime @updatedAt
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedBy     String             @default("you")
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  links         SourceLink[]
+  connections   SocialConnection[]
+  ideas         Idea[]
+
+  @@index([userId, position])
+}
+
+enum LinkKind {
+  WEBSITE
+  GITHUB_REPO
+  GITHUB_PROFILE
+  PAGE
+}
+
+/// A link the AI reads for a space: a product site, a GitHub repo or profile, a changelog, any page.
+/// We read the title and one line when it is added. Private repos are read by the user's own AI.
+model SourceLink {
+  id          String   @id @default(cuid())
+  spaceId     String
+  url         String
+  kind        LinkKind
+  title       String   @default("")
+  description String   @default("")
+  isPrivate   Boolean  @default(false)
+  /// False when the page could not be read when it was added (it is kept; the AI may still reach it).
+  readOk      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  space       Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@unique([spaceId, url])
 }
 
 enum IdeaKind {
@@ -78,6 +126,7 @@ enum IdeaStatus {
 model Idea {
   id              String      @id @default(cuid())
   userId          String
+  spaceId         String
   kind            IdeaKind
   title           String
   why             String      @default("")
@@ -99,11 +148,13 @@ model Idea {
   dedupeKey       String
   createdAt       DateTime    @default(now())
   user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  space           Space       @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   posts           Post[]
   shortLinks      ShortLink[]
 
   @@unique([userId, dedupeKey])
   @@index([userId, createdAt])
+  @@index([spaceId, createdAt])
 }
 
 enum Channel {
@@ -139,10 +190,12 @@ model Post {
   @@index([userId, createdAt])
 }
 
-/// A connected X or LinkedIn account. Tokens are encrypted (AES-256-GCM).
+/// A connected X or LinkedIn account, in one space (one X and one LinkedIn per space). Tokens are
+/// encrypted (AES-256-GCM).
 model SocialConnection {
   id              String    @id @default(cuid())
   userId          String
+  spaceId         String
   channel         Channel
   accountId       String
   accountName     String
@@ -152,8 +205,11 @@ model SocialConnection {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  space           Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, channel])
+  @@unique([spaceId, channel])
+  /// The same account is in one space only.
+  @@unique([userId, channel, accountId])
 }
 
 /// MCP tokens for the user's AI. Only the SHA-256 hash and a display prefix are stored.
