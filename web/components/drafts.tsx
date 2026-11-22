@@ -16,7 +16,7 @@ import {
 import { isApiError } from '../api';
 import { useNow } from '../lib/hooks';
 import { channelName, clock } from '../lib/format';
-import { latestPost, usePostIdea, useUndoPost } from '../queries';
+import { latestPost, usePostIdea, useSpaces, useUndoPost } from '../queries';
 import { ChannelLogo } from './brand';
 import { AutoTextarea, ErrorText } from './ui';
 
@@ -156,6 +156,10 @@ export function ChannelAction({
   const post = latestPost(idea, channel);
   const send = usePostIdea(idea.id);
   const name = channelName(channel);
+  // The account of this draft's own space, so you see where it goes before you tap.
+  const account = useSpaces()
+    .data?.find((s) => s.id === idea.spaceId)
+    ?.connections.find((c) => c.channel === channel);
   const reason = blockReason(channel, take, draft);
 
   async function onPost() {
@@ -190,7 +194,7 @@ export function ChannelAction({
           aria-describedby={reason ? `${idea.id}-${channel}-reason` : undefined}
         >
           {!failed && <ChannelLogo channel={channel} size={big ? 16 : 13} />}
-          {failed ? 'Try again' : `Post to ${name}`}
+          {failed ? 'Try again' : account ? `Post to ${name} as ${account.accountName}` : `Post to ${name}`}
         </button>
         {reason && (
           <span id={`${idea.id}-${channel}-reason`} className="text-xs text-text-secondary md:text-xs">
@@ -200,9 +204,9 @@ export function ChannelAction({
       </div>
       {notConnected ? (
         <p role="alert" className="text-[13px] text-danger-text">
-          Connect {name} first.{' '}
-          <Link to="/connect" className="font-semibold underline underline-offset-2">
-            Go to Connect
+          Connect {name} to this space first.{' '}
+          <Link to="/space" className="font-semibold underline underline-offset-2">
+            Go to Space
           </Link>
         </p>
       ) : (
