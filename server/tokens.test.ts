@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { signedIn } from './test/helpers.js';
 
-describe('AI tokens and profile from the app', () => {
+describe('AI tokens and spaces from the app', () => {
   it('shows the token once, lists it without the secret, and revokes it', async () => {
     const { agent } = await signedIn();
     const created = (await agent.post('/api/tokens').send({ name: 'Claude Code' }).expect(200)).body;
@@ -26,19 +26,27 @@ describe('AI tokens and profile from the app', () => {
     expect(res.body.error.code).toBe('TOKEN_LIMIT');
   });
 
-  it('saves the profile as "you" and checks it', async () => {
-    const { agent } = await signedIn();
+  it('saves a space as "you" and checks it', async () => {
+    const { agent, space } = await signedIn();
     const saved = (
       await agent
-        .put('/api/profile')
-        .send({ goal: 'NETWORK', postsPerDay: 2, styleSamples: ['One post'] })
+        .patch(`/api/spaces/${space.id}`)
+        .send({ goal: 'NETWORK', postsPerDay: 2, styleSamples: ['One post'], tone: 'BOLD', readyAt: '07:30' })
         .expect(200)
     ).body;
-    expect(saved).toMatchObject({ goal: 'NETWORK', postsPerDay: 2, styleSamples: ['One post'], updatedBy: 'you' });
+    expect(saved).toMatchObject({
+      goal: 'NETWORK',
+      postsPerDay: 2,
+      styleSamples: ['One post'],
+      tone: 'BOLD',
+      readyAt: '07:30',
+      updatedBy: 'you',
+    });
     const bad = await agent
-      .put('/api/profile')
+      .patch(`/api/spaces/${space.id}`)
       .send({ interests: Array(9).fill('a') })
       .expect(400);
     expect(bad.body.error.fields).toEqual(['interests']);
+    await agent.patch(`/api/spaces/${space.id}`).send({ readyAt: '25:00' }).expect(400);
   });
 });
